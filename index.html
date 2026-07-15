@@ -2448,6 +2448,8 @@
 
     const APP_KEY = "nga-routine-builder-v1";
     const APP_VERSION = "1.2.0";
+    const MAX_EXTRA_SWINGS = 3;
+    const EXTRA_SWING_EVENTS = new Set(["rings", "parallelBars", "highBar"]);
     const STUDENTS = [
       { id: "benjamin-bowie-christopher", name: "Benjamin Bowie Christopher" },
       { id: "kenneth-chan", name: "Kenneth Chan" },
@@ -2631,6 +2633,7 @@
         sourceNote: sourceNoteFrom(raw),
         isDismount: raw.isDismount === undefined ? normalizeEG(raw.eg || raw.elementGroup || raw.plannedEg || "") === "IV" : Boolean(raw.isDismount),
         countsAsSkill: raw.countsAsSkill !== false,
+        isExtraSwing: raw.isExtraSwing === undefined ? undefined : Boolean(raw.isExtraSwing),
         applicableLevels: Array.isArray(raw.applicableLevels) ? raw.applicableLevels.slice(0, 8).map(String) : [],
         restrictions: Array.isArray(raw.restrictions) ? raw.restrictions.slice(0, 8).map(String) : [],
         custom: Boolean(raw.custom)
@@ -2937,6 +2940,7 @@
         sourceNote: String(raw.sourceNote || ""),
         isDismount: raw.isDismount === undefined ? normalizeEG(raw.eg || raw.elementGroup || raw.plannedEg || "") === "IV" : Boolean(raw.isDismount),
         countsAsSkill: raw.countsAsSkill !== false,
+        isExtraSwing: raw.isExtraSwing === undefined ? undefined : Boolean(raw.isExtraSwing),
         applicableLevels: Array.isArray(raw.applicableLevels) ? raw.applicableLevels.slice(0, 8).map(String) : [],
         restrictions: Array.isArray(raw.restrictions) ? raw.restrictions.slice(0, 8).map(String) : [],
         catalogVersion: String(raw.catalogVersion || ""),
@@ -3530,7 +3534,8 @@
         return renderRoutineItem(skill, index, repeatInfo[index], creditIds.indexOf(skill.id) !== -1, mushroomMode);
       }).join("") : "<div class=\"empty-routine\">Drag skills here in the athlete’s intended performance order.<br><br>On iPad, tap a library skill to add it.</div>";
       const title = mushroomMode ? "Mushroom sequence draft" : "Routine sequence";
-      const sequenceNote = "Drag to reorder. Catalog-marked dismounts are pinned at the finish.";
+      const swingNote = EXTRA_SWING_EVENTS.has(eventId) ? " Extra swings are limited to " + MAX_EXTRA_SWINGS + "." : "";
+      const sequenceNote = "Drag to reorder. Catalog-marked dismounts are pinned at the finish." + swingNote;
       return "<section class=\"panel\"><div class=\"panel-head\"><div><h3>" + title + "</h3><div class=\"tiny\">" + sequenceNote + "</div></div><button class=\"button small\" type=\"button\" data-action=\"sort-eg\">Sort sequence by EG</button></div><div class=\"panel-body\"><div class=\"routine-list\" id=\"routineList\">" + list + "</div><label class=\"field\" style=\"margin-top:12px\">Coach notes<textarea class=\"notes\" data-notes placeholder=\"Holds, connections, equipment, coaching cues, judge questions…\">" + escapeHtml(data.notes) + "</textarea></label></div></section>";
     }
 
@@ -3575,6 +3580,9 @@
         { ok: !result.spotted.length, label: "No spot-used conversion pending", detail: result.spotted.length ? result.spotted.length + " spotted step(s) are treated as SS and carry a −0.50 review flag." : "No spotted steps marked" },
         { ok: result.catalogReady, label: "Catalog rows verified", detail: result.catalogReady ? "Every selected row is marked verified by the loaded catalog." : result.unverified.length + " selected row(s) remain legacy, custom, or unreviewed." }
       ];
+      if (EXTRA_SWING_EVENTS.has(eventId)) {
+        rows.splice(1, 0, { ok: result.extraSwingOk, label: "Extra swing limit", detail: result.extraSwingCount + " extra swing" + (result.extraSwingCount === 1 ? "" : "s") + " selected; maximum " + MAX_EXTRA_SWINGS });
+      }
       const credit = result.creditPlan ? "<div class=\"credit-list\"><strong>Possible credited EG draft — sequence order stays unchanged:</strong>" + result.creditPlan.map(function (item) { return "<span>EG " + escapeHtml(item.eg) + " · " + escapeHtml(item.name) + " (" + escapeHtml(effectiveKind(item)) + ")</span>"; }).join("") + "</div>" : "";
       return "<section class=\"panel\"><div class=\"panel-head\"><h3>Requirement check</h3><span class=\"catalog-pill " + state.catalog.status + "\">" + escapeHtml(currentAthlete().level) + "</span></div><div class=\"panel-body\"><div class=\"requirement-summary\"><div class=\"decision " + decisionClass + "\"><div class=\"decision-title\">" + escapeHtml(title) + "</div><div class=\"decision-copy\">" + escapeHtml(copy) + "</div>" + credit + "</div><div class=\"checks\">" + rows.map(renderCheckRow).join("") + "</div><p class=\"tiny\">Only unique FIG/SS skills satisfy the routine-size check. A repeat cannot occupy an EG/value-part credit slot. B/C skills may be extras; this checker reserves the required mix specifically for FIG A slots and SS slots.</p></div></div></section>";
     }
@@ -3586,6 +3594,27 @@
 
     function effectiveKind(skill) {
       return skill && skill.spotted ? "SS" : (skill ? skill.kind : "Unknown");
+    }
+
+    function isExtraSwing(skill) {
+      if (!skill) return false;
+      if (skill.isExtraSwing === true) return true;
+      if (skill.isExtraSwing === false) return false;
+      return /\b(?:extra\s+)?swings?\b/i.test(String(skill.name || ""));
+    }
+
+    function extraSwingCount(eventId, skills) {
+      if (!EXTRA_SWING_EVENTS.has(eventId)) return 0;
+      return (skills || []).filter(isExtraSwing).length;
+    }
+
+    function canAddSkill(eventId, skill, skills) {
+      if (!EXTRA_SWING_EVENTS.has(eventId) || !isExtraSwing(skill)) return true;
+      return extraSwingCount(eventId, skills) < MAX_EXTRA_SWINGS;
+    }
+
+    function extraSwingLimitMessage(eventId) {
+      return EVENTS[eventId].name + " routines allow up to " + MAX_EXTRA_SWINGS + " extra swings. Remove an existing swing before adding another.";
     }
 
     function getRepeatInfo(skills) {
@@ -3617,6 +3646,7 @@
         return { skills: skills, uniqueSkills: [], mathPass: false, catalogReady: false, shortStatus: "choose a level", creditPlan: null, unverified: skills, spotted: [], outOfRange: [], missingGroups: ["I", "II", "III", "IV"] };
       }
       const performedSkills = skills.filter(function (skill) { return skill.countsAsSkill !== false; });
+      const extraSwingCountForEvent = extraSwingCount(eventId, skills);
       const ssCount = performedSkills.filter(function (skill) { return effectiveKind(skill) === "SS"; }).length;
       const outOfRange = performedSkills.filter(function (skill) {
         const kind = effectiveKind(skill);
@@ -3633,11 +3663,12 @@
       const spotted = performedSkills.filter(function (skill) { return skill.spotted; });
       const unverified = performedSkills.filter(function (skill) { return skill.sourceStatus !== "verified"; });
       const countOk = eligible.length >= rules.minUniqueSkills && eligible.length <= rules.maxUniqueSkills;
+      const extraSwingOk = extraSwingCountForEvent <= MAX_EXTRA_SWINGS;
       const ssOk = ssCount <= rules.maxSS;
       const figOk = !outOfRange.length && !unsupported.length;
       const allGroups = !missingGroups.length;
       const catalogReady = state.catalog.status === "verified" && !unverified.length;
-      const mathPass = countOk && ssOk && figOk && allGroups && Boolean(creditPlan) && !spotted.length;
+      const mathPass = countOk && extraSwingOk && ssOk && figOk && allGroups && Boolean(creditPlan) && !spotted.length;
       let shortStatus = "needs requirements";
       if (mathPass) shortStatus = catalogReady ? "draft math complete" : "math complete; catalog review";
       else if (eligible.length < rules.minUniqueSkills) shortStatus = "needs more unique skills";
@@ -3646,6 +3677,8 @@
         skills: skills,
         uniqueSkills: eligible,
         countOk: countOk,
+        extraSwingCount: extraSwingCountForEvent,
+        extraSwingOk: extraSwingOk,
         ssOk: ssOk,
         figOk: figOk,
         allGroups: allGroups,
@@ -3777,6 +3810,11 @@
       const skill = state.catalog.skills.find(function (item) { return item.id === catalogId; });
       if (!skill || currentEvent === "overview" || EVENTS[currentEvent].type === "vault") return;
       const data = currentEventData();
+      if (!canAddSkill(currentEvent, skill, data.skills)) {
+        playSound("error");
+        window.alert(extraSwingLimitMessage(currentEvent));
+        return;
+      }
       const occurrence = {
         id: uniqueId("step"),
         catalogId: skill.id,
@@ -3791,6 +3829,7 @@
         sourceNote: skill.sourceNote,
         isDismount: Boolean(skill.isDismount),
         countsAsSkill: skill.countsAsSkill !== false,
+        isExtraSwing: skill.isExtraSwing,
         applicableLevels: Array.isArray(skill.applicableLevels) ? skill.applicableLevels.slice() : [],
         restrictions: Array.isArray(skill.restrictions) ? skill.restrictions.slice() : [],
         catalogVersion: state.catalog.catalogVersion || "",
@@ -3819,7 +3858,7 @@
       }
       const id = uniqueId("custom");
       const skills = currentEventData().skills;
-      skills.push({
+      const occurrence = {
         id: id,
         catalogId: "",
         repeatKey: "custom-" + normalizeText(name),
@@ -3833,13 +3872,20 @@
         sourceNote: "Coach-entered temporary skill",
         isDismount: egInput.value === "IV",
         countsAsSkill: true,
+        isExtraSwing: /\b(?:extra\s+)?swings?\b/i.test(name),
         applicableLevels: [],
         restrictions: ["Coach-entered temporary skill"],
         catalogVersion: state.catalog.catalogVersion || "",
         rulesetId: state.catalog.rulesetId || "",
         spotted: false,
         custom: true
-      });
+      };
+      if (!canAddSkill(currentEvent, occurrence, skills)) {
+        playSound("error");
+        window.alert(extraSwingLimitMessage(currentEvent));
+        return;
+      }
+      skills.push(occurrence);
       const dismountMoved = pinDismountsToFinish(skills);
       playSound("success");
       saveState(dismountMoved ? "Kept catalog-marked dismounts at the routine finish" : undefined);
