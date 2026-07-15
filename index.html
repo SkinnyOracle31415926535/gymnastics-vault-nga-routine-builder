@@ -2426,6 +2426,7 @@
         <span id="catalogPill" class="catalog-pill none">No catalog</span>
         <button class="button small" id="useBundledCatalog" type="button">Use current catalog</button>
         <button class="button small" id="importCatalog" type="button">Import catalog file</button>
+        <button class="button small quiet" id="catalogEditMode" type="button">Edit catalog</button>
       </div>
     </section>
 
@@ -2448,6 +2449,8 @@
 
     const APP_KEY = "nga-routine-builder-v1";
     const APP_VERSION = "1.2.0";
+    const MAX_EXTRA_SWINGS = 3;
+    const EXTRA_SWING_EVENTS = new Set(["rings", "parallelBars", "highBar"]);
     const STUDENTS = [
       { id: "benjamin-bowie-christopher", name: "Benjamin Bowie Christopher" },
       { id: "kenneth-chan", name: "Kenneth Chan" },
@@ -2631,6 +2634,8 @@
         sourceNote: sourceNoteFrom(raw),
         isDismount: raw.isDismount === undefined ? normalizeEG(raw.eg || raw.elementGroup || raw.plannedEg || "") === "IV" : Boolean(raw.isDismount),
         countsAsSkill: raw.countsAsSkill !== false,
+        isExtraSwing: raw.isExtraSwing === undefined ? undefined : Boolean(raw.isExtraSwing),
+        locallyEdited: Boolean(raw.locallyEdited),
         applicableLevels: Array.isArray(raw.applicableLevels) ? raw.applicableLevels.slice(0, 8).map(String) : [],
         restrictions: Array.isArray(raw.restrictions) ? raw.restrictions.slice(0, 8).map(String) : [],
         custom: Boolean(raw.custom)
@@ -2769,6 +2774,7 @@
     const filtersByEvent = {};
     const FAVORITE_EDIT_PASSWORD = "4159";
     let favoriteEditUnlocked = false;
+    let catalogEditMode = false;
     const FAVORITE_SEED_VERSION = "1";
     const REQUESTED_STARTER_FAVORITES = [
       { apparatus: "floor", name: "Arabesque" },
@@ -2937,6 +2943,8 @@
         sourceNote: String(raw.sourceNote || ""),
         isDismount: raw.isDismount === undefined ? normalizeEG(raw.eg || raw.elementGroup || raw.plannedEg || "") === "IV" : Boolean(raw.isDismount),
         countsAsSkill: raw.countsAsSkill !== false,
+        isExtraSwing: raw.isExtraSwing === undefined ? undefined : Boolean(raw.isExtraSwing),
+        locallyEdited: Boolean(raw.locallyEdited),
         applicableLevels: Array.isArray(raw.applicableLevels) ? raw.applicableLevels.slice(0, 8).map(String) : [],
         restrictions: Array.isArray(raw.restrictions) ? raw.restrictions.slice(0, 8).map(String) : [],
         catalogVersion: String(raw.catalogVersion || ""),
@@ -3343,6 +3351,10 @@
       text.textContent = catalogLabel().toLowerCase();
       pill.className = "catalog-pill " + catalog.status;
       pill.textContent = catalog.status === "none" ? "No catalog" : catalog.skills.length + " candidates";
+      const editButton = document.getElementById("catalogEditMode");
+      editButton.disabled = !catalog.skills.length;
+      editButton.classList.toggle("is-active", catalogEditMode);
+      editButton.textContent = catalogEditMode ? "Done editing" : "Edit catalog";
       if (catalog.status === "legacy") {
         copy.textContent = "Loaded from " + (catalog.sourceLabel || "the legacy skill list") + ". It is based on 2022–2026 NGA material and is for draft planning only.";
       } else if (catalog.status === "candidate") {
@@ -3493,7 +3505,7 @@
       } else {
         libraryContent = filtered.map(function (skill) { return renderSkillCard(skill); }).join("");
       }
-      const intro = mushroomMode ? "Legacy pommel candidates can help you sketch a sequence, but they do not drive the mushroom checklist." : "Click a skill to add it, or drag it into the routine.";
+      const intro = catalogEditMode ? "Edit a skill’s value or element group, then save. Corrections apply to existing routine copies and remain local to this browser." : (mushroomMode ? "Legacy pommel candidates can help you sketch a sequence, but they do not drive the mushroom checklist." : "Click a skill to add it, or drag it into the routine.");
       const favoriteEditor = favoriteEditUnlocked
         ? "<span class=\"favorite-mode-status\">★ STAR EDIT MODE ON</span><button type=\"button\" class=\"button quiet small\" data-action=\"lock-stars\">Lock stars</button>"
         : "<form class=\"favorite-lock\" data-favorite-form><label>★ edits locked <input type=\"password\" data-favorite-password inputmode=\"numeric\" autocomplete=\"off\" maxlength=\"16\" aria-label=\"Favorite password\" placeholder=\"password\"></label><button type=\"submit\" class=\"button quiet small\">Unlock stars</button></form>";
@@ -3515,7 +3527,9 @@
       const favoriteKey = skillFavoriteKey(skill);
       const locked = favoriteEditUnlocked ? "" : " disabled aria-disabled=\"true\"";
       const title = favoriteEditUnlocked ? (favorite ? "Remove from favorites" : "Add to favorites") : "Favorite editing is locked";
-      return "<div class=\"skill-card\" draggable=\"true\" data-drag-catalog-id=\"" + escapeHtml(skill.id) + "\"><button type=\"button\" class=\"skill-select\" data-catalog-id=\"" + escapeHtml(skill.id) + "\"><span class=\"skill-code\">" + escapeHtml(code) + "</span><span><span class=\"skill-name\">" + escapeHtml(skill.name) + "</span><span class=\"skill-meta\"><span class=\"chip " + kindClass + "\">" + escapeHtml(skill.kind) + "</span><span class=\"chip\">EG " + escapeHtml(skill.eg || "?") + "</span></span></span></button><button type=\"button\" class=\"favorite-star" + (favorite ? " is-starred" : "") + "\" data-action=\"toggle-star\" data-star-key=\"" + escapeHtml(favoriteKey) + "\" aria-pressed=\"" + (favorite ? "true" : "false") + "\" aria-label=\"" + (favorite ? "Remove " : "Add ") + escapeHtml(skill.name) + (favorite ? " from favorite skills" : " to favorite skills") + "\" title=\"" + title + "\"" + locked + ">" + (favorite ? "★" : "☆") + "</button></div>";
+      const localFlag = skill.locallyEdited ? "<span class=\"chip unknown\">local correction</span>" : "";
+      const editor = catalogEditMode ? "<div class=\"manual-grid\" style=\"padding:0 8px 8px\"><label>Value<select data-catalog-edit=\"kind\"><option value=\"SS\"" + selectedAttr(skill.kind, "SS") + ">SS</option><option value=\"A\"" + selectedAttr(skill.kind, "A") + ">A</option><option value=\"B\"" + selectedAttr(skill.kind, "B") + ">B</option><option value=\"C\"" + selectedAttr(skill.kind, "C") + ">C</option><option value=\"D\"" + selectedAttr(skill.kind, "D") + ">D</option><option value=\"E\"" + selectedAttr(skill.kind, "E") + ">E</option><option value=\"F\"" + selectedAttr(skill.kind, "F") + ">F</option><option value=\"G\"" + selectedAttr(skill.kind, "G") + ">G</option></select></label><label>Element group<select data-catalog-edit=\"eg\"><option value=\"I\"" + selectedAttr(skill.eg, "I") + ">EG I</option><option value=\"II\"" + selectedAttr(skill.eg, "II") + ">EG II</option><option value=\"III\"" + selectedAttr(skill.eg, "III") + ">EG III</option><option value=\"IV\"" + selectedAttr(skill.eg, "IV") + ">EG IV</option></select></label><button type=\"button\" class=\"button small\" data-action=\"save-catalog-skill\" data-catalog-id=\"" + escapeHtml(skill.id) + "\">Save correction</button></div>" : "";
+      return "<div class=\"skill-card\" draggable=\"true\" data-drag-catalog-id=\"" + escapeHtml(skill.id) + "\"><button type=\"button\" class=\"skill-select\" data-catalog-id=\"" + escapeHtml(skill.id) + "\"><span class=\"skill-code\">" + escapeHtml(code) + "</span><span><span class=\"skill-name\">" + escapeHtml(skill.name) + "</span><span class=\"skill-meta\"><span class=\"chip " + kindClass + "\">" + escapeHtml(skill.kind) + "</span><span class=\"chip\">EG " + escapeHtml(skill.eg || "?") + "</span>" + localFlag + "</span></span></button><button type=\"button\" class=\"favorite-star" + (favorite ? " is-starred" : "") + "\" data-action=\"toggle-star\" data-star-key=\"" + escapeHtml(favoriteKey) + "\" aria-pressed=\"" + (favorite ? "true" : "false") + "\" aria-label=\"" + (favorite ? "Remove " : "Add ") + escapeHtml(skill.name) + (favorite ? " from favorite skills" : " to favorite skills") + "\" title=\"" + title + "\"" + locked + ">" + (favorite ? "★" : "☆") + "</button>" + editor + "</div>";
     }
 
     function renderManualSkillForm() {
@@ -3530,7 +3544,8 @@
         return renderRoutineItem(skill, index, repeatInfo[index], creditIds.indexOf(skill.id) !== -1, mushroomMode);
       }).join("") : "<div class=\"empty-routine\">Drag skills here in the athlete’s intended performance order.<br><br>On iPad, tap a library skill to add it.</div>";
       const title = mushroomMode ? "Mushroom sequence draft" : "Routine sequence";
-      const sequenceNote = "Drag to reorder. Catalog-marked dismounts are pinned at the finish.";
+      const swingNote = EXTRA_SWING_EVENTS.has(eventId) ? " Extra swings are limited to " + MAX_EXTRA_SWINGS + "." : "";
+      const sequenceNote = "Drag to reorder. Catalog-marked dismounts are pinned at the finish." + swingNote;
       return "<section class=\"panel\"><div class=\"panel-head\"><div><h3>" + title + "</h3><div class=\"tiny\">" + sequenceNote + "</div></div><button class=\"button small\" type=\"button\" data-action=\"sort-eg\">Sort sequence by EG</button></div><div class=\"panel-body\"><div class=\"routine-list\" id=\"routineList\">" + list + "</div><label class=\"field\" style=\"margin-top:12px\">Coach notes<textarea class=\"notes\" data-notes placeholder=\"Holds, connections, equipment, coaching cues, judge questions…\">" + escapeHtml(data.notes) + "</textarea></label></div></section>";
     }
 
@@ -3538,7 +3553,7 @@
       const effective = effectiveKind(skill);
       const kindClass = effective === "SS" ? "ss" : effective === "Unknown" ? "unknown" : "fig";
       const classes = "routine-item" + (isCredit ? " credit" : "") + (repeat ? " repeat" : "");
-      const status = skill.custom ? "Coach-entered / unverified" : sourceStatusLabel(skill.sourceStatus);
+      const status = skill.custom ? "Coach-entered / unverified" : sourceStatusLabel(skill.sourceStatus, skill.locallyEdited);
       const repeatNote = repeat ? "<span class=\"chip ss\">repeat: no EG/VP credit</span>" : "";
       const spotted = skill.spotted ? "<span class=\"chip unknown\">spot used: treated as SS, −0.50 review</span>" : "";
       const credit = isCredit ? "<span class=\"chip\" style=\"border-color:rgba(121,221,162,.65);color:#d7ffe5\">possible EG credit</span>" : "";
@@ -3547,7 +3562,8 @@
       return "<article class=\"" + classes + "\" draggable=\"true\" data-routine-index=\"" + index + "\"><span class=\"step-number\">" + (index + 1) + "</span><div><div class=\"routine-name\">" + escapeHtml(skill.name) + "</div><div class=\"routine-flags\"><span class=\"chip " + kindClass + "\">" + escapeHtml(effective) + "</span><span class=\"chip\">" + escapeHtml(skill.code || "no code") + "</span><span class=\"chip\">EG " + escapeHtml(eg || "?") + "</span>" + finishOnly + credit + repeatNote + spotted + "</div><div class=\"source-label\">" + escapeHtml(status) + "</div></div><div class=\"routine-controls\">" + (mushroomMode ? "" : "<label class=\"check-inline\"><input type=\"checkbox\" data-step-spotted=\"" + index + "\"" + (skill.spotted ? " checked" : "") + "> spot used</label>") + "<div class=\"step-actions\"><button type=\"button\" class=\"button small quiet\" data-action=\"move-up\" data-index=\"" + index + "\" aria-label=\"Move skill up\">↑</button><button type=\"button\" class=\"button small quiet\" data-action=\"move-down\" data-index=\"" + index + "\" aria-label=\"Move skill down\">↓</button><button type=\"button\" class=\"button small danger\" data-action=\"remove-skill\" data-index=\"" + index + "\" aria-label=\"Remove skill\">×</button></div></div></article>";
     }
 
-    function sourceStatusLabel(status) {
+    function sourceStatusLabel(status, locallyEdited) {
+      if (locallyEdited) return "local correction — needs review";
       if (status === "verified") return "page-cited verified source";
       if (status === "legacy") return "legacy candidate — needs revalidation";
       if (status === "needs_review") return "needs source review";
@@ -3575,6 +3591,9 @@
         { ok: !result.spotted.length, label: "No spot-used conversion pending", detail: result.spotted.length ? result.spotted.length + " spotted step(s) are treated as SS and carry a −0.50 review flag." : "No spotted steps marked" },
         { ok: result.catalogReady, label: "Catalog rows verified", detail: result.catalogReady ? "Every selected row is marked verified by the loaded catalog." : result.unverified.length + " selected row(s) remain legacy, custom, or unreviewed." }
       ];
+      if (EXTRA_SWING_EVENTS.has(eventId)) {
+        rows.splice(1, 0, { ok: result.extraSwingOk, label: "Extra swing limit", detail: result.extraSwingCount + " extra swing" + (result.extraSwingCount === 1 ? "" : "s") + " selected; maximum " + MAX_EXTRA_SWINGS });
+      }
       const credit = result.creditPlan ? "<div class=\"credit-list\"><strong>Possible credited EG draft — sequence order stays unchanged:</strong>" + result.creditPlan.map(function (item) { return "<span>EG " + escapeHtml(item.eg) + " · " + escapeHtml(item.name) + " (" + escapeHtml(effectiveKind(item)) + ")</span>"; }).join("") + "</div>" : "";
       return "<section class=\"panel\"><div class=\"panel-head\"><h3>Requirement check</h3><span class=\"catalog-pill " + state.catalog.status + "\">" + escapeHtml(currentAthlete().level) + "</span></div><div class=\"panel-body\"><div class=\"requirement-summary\"><div class=\"decision " + decisionClass + "\"><div class=\"decision-title\">" + escapeHtml(title) + "</div><div class=\"decision-copy\">" + escapeHtml(copy) + "</div>" + credit + "</div><div class=\"checks\">" + rows.map(renderCheckRow).join("") + "</div><p class=\"tiny\">Only unique FIG/SS skills satisfy the routine-size check. A repeat cannot occupy an EG/value-part credit slot. B/C skills may be extras; this checker reserves the required mix specifically for FIG A slots and SS slots.</p></div></div></section>";
     }
@@ -3586,6 +3605,27 @@
 
     function effectiveKind(skill) {
       return skill && skill.spotted ? "SS" : (skill ? skill.kind : "Unknown");
+    }
+
+    function isExtraSwing(skill) {
+      if (!skill) return false;
+      if (skill.isExtraSwing === true) return true;
+      if (skill.isExtraSwing === false) return false;
+      return /\b(?:extra\s+)?swings?\b/i.test(String(skill.name || ""));
+    }
+
+    function extraSwingCount(eventId, skills) {
+      if (!EXTRA_SWING_EVENTS.has(eventId)) return 0;
+      return (skills || []).filter(isExtraSwing).length;
+    }
+
+    function canAddSkill(eventId, skill, skills) {
+      if (!EXTRA_SWING_EVENTS.has(eventId) || !isExtraSwing(skill)) return true;
+      return extraSwingCount(eventId, skills) < MAX_EXTRA_SWINGS;
+    }
+
+    function extraSwingLimitMessage(eventId) {
+      return EVENTS[eventId].name + " routines allow up to " + MAX_EXTRA_SWINGS + " extra swings. Remove an existing swing before adding another.";
     }
 
     function getRepeatInfo(skills) {
@@ -3617,6 +3657,7 @@
         return { skills: skills, uniqueSkills: [], mathPass: false, catalogReady: false, shortStatus: "choose a level", creditPlan: null, unverified: skills, spotted: [], outOfRange: [], missingGroups: ["I", "II", "III", "IV"] };
       }
       const performedSkills = skills.filter(function (skill) { return skill.countsAsSkill !== false; });
+      const extraSwingCountForEvent = extraSwingCount(eventId, skills);
       const ssCount = performedSkills.filter(function (skill) { return effectiveKind(skill) === "SS"; }).length;
       const outOfRange = performedSkills.filter(function (skill) {
         const kind = effectiveKind(skill);
@@ -3631,13 +3672,14 @@
       const missingGroups = ["I", "II", "III", "IV"].filter(function (eg) { return !groupSet.has(eg); });
       const creditPlan = findCreditPlan(eligible, rules);
       const spotted = performedSkills.filter(function (skill) { return skill.spotted; });
-      const unverified = performedSkills.filter(function (skill) { return skill.sourceStatus !== "verified"; });
+      const unverified = performedSkills.filter(function (skill) { return skill.sourceStatus !== "verified" || skill.locallyEdited; });
       const countOk = eligible.length >= rules.minUniqueSkills && eligible.length <= rules.maxUniqueSkills;
+      const extraSwingOk = extraSwingCountForEvent <= MAX_EXTRA_SWINGS;
       const ssOk = ssCount <= rules.maxSS;
       const figOk = !outOfRange.length && !unsupported.length;
       const allGroups = !missingGroups.length;
       const catalogReady = state.catalog.status === "verified" && !unverified.length;
-      const mathPass = countOk && ssOk && figOk && allGroups && Boolean(creditPlan) && !spotted.length;
+      const mathPass = countOk && extraSwingOk && ssOk && figOk && allGroups && Boolean(creditPlan) && !spotted.length;
       let shortStatus = "needs requirements";
       if (mathPass) shortStatus = catalogReady ? "draft math complete" : "math complete; catalog review";
       else if (eligible.length < rules.minUniqueSkills) shortStatus = "needs more unique skills";
@@ -3646,6 +3688,8 @@
         skills: skills,
         uniqueSkills: eligible,
         countOk: countOk,
+        extraSwingCount: extraSwingCountForEvent,
+        extraSwingOk: extraSwingOk,
         ssOk: ssOk,
         figOk: figOk,
         allGroups: allGroups,
@@ -3777,6 +3821,11 @@
       const skill = state.catalog.skills.find(function (item) { return item.id === catalogId; });
       if (!skill || currentEvent === "overview" || EVENTS[currentEvent].type === "vault") return;
       const data = currentEventData();
+      if (!canAddSkill(currentEvent, skill, data.skills)) {
+        playSound("error");
+        window.alert(extraSwingLimitMessage(currentEvent));
+        return;
+      }
       const occurrence = {
         id: uniqueId("step"),
         catalogId: skill.id,
@@ -3791,6 +3840,7 @@
         sourceNote: skill.sourceNote,
         isDismount: Boolean(skill.isDismount),
         countsAsSkill: skill.countsAsSkill !== false,
+        isExtraSwing: skill.isExtraSwing,
         applicableLevels: Array.isArray(skill.applicableLevels) ? skill.applicableLevels.slice() : [],
         restrictions: Array.isArray(skill.restrictions) ? skill.restrictions.slice() : [],
         catalogVersion: state.catalog.catalogVersion || "",
@@ -3819,7 +3869,7 @@
       }
       const id = uniqueId("custom");
       const skills = currentEventData().skills;
-      skills.push({
+      const occurrence = {
         id: id,
         catalogId: "",
         repeatKey: "custom-" + normalizeText(name),
@@ -3833,17 +3883,64 @@
         sourceNote: "Coach-entered temporary skill",
         isDismount: egInput.value === "IV",
         countsAsSkill: true,
+        isExtraSwing: /\b(?:extra\s+)?swings?\b/i.test(name),
         applicableLevels: [],
         restrictions: ["Coach-entered temporary skill"],
         catalogVersion: state.catalog.catalogVersion || "",
         rulesetId: state.catalog.rulesetId || "",
         spotted: false,
         custom: true
-      });
+      };
+      if (!canAddSkill(currentEvent, occurrence, skills)) {
+        playSound("error");
+        window.alert(extraSwingLimitMessage(currentEvent));
+        return;
+      }
+      skills.push(occurrence);
       const dismountMoved = pinDismountsToFinish(skills);
       playSound("success");
       saveState(dismountMoved ? "Kept catalog-marked dismounts at the routine finish" : undefined);
       renderApp();
+    }
+
+    function updateCatalogSkill(catalogId, card) {
+      const skill = state.catalog.skills.find(function (item) { return item.id === catalogId; });
+      const kindInput = card && card.querySelector("[data-catalog-edit=\"kind\"]");
+      const egInput = card && card.querySelector("[data-catalog-edit=\"eg\"]");
+      const kind = normalizeKind(kindInput && kindInput.value);
+      const eg = normalizeEG(egInput && egInput.value);
+      if (!skill || !kind || !eg) {
+        playSound("error");
+        window.alert("Choose both a skill value and an element group before saving the correction.");
+        return;
+      }
+      skill.kind = kind;
+      skill.eg = eg;
+      skill.plannedEg = eg;
+      skill.isDismount = eg === "IV";
+      skill.locallyEdited = true;
+      let changedCopies = 0;
+      function updateCopies(events) {
+        Object.keys(events || {}).forEach(function (eventId) {
+          const skills = events[eventId] && events[eventId].skills;
+          if (!Array.isArray(skills)) return;
+          skills.forEach(function (copy) {
+            if (copy.catalogId !== skill.id) return;
+            copy.kind = kind;
+            copy.eg = eg;
+            copy.plannedEg = eg;
+            copy.isDismount = eg === "IV";
+            copy.locallyEdited = true;
+            changedCopies += 1;
+          });
+          pinDismountsToFinish(skills);
+        });
+      }
+      Object.keys(state.athletes).forEach(function (athleteId) { updateCopies(state.athletes[athleteId].events); });
+      state.routineLibrary.forEach(function (routine) { updateCopies(routine.events); });
+      playSound("success");
+      saveState("Saved local correction" + (changedCopies ? " · updated " + changedCopies + " routine " + (changedCopies === 1 ? "copy" : "copies") : ""));
+      renderApp({ preserveLibraryScroll: true });
     }
 
     function clearCurrentEvent() {
@@ -4030,7 +4127,7 @@
             flags.push(effectiveKind(skill));
             flags.push("EG " + (skill.eg || "?"));
             if (skill.spotted) flags.push("spot used");
-            if (skill.sourceStatus !== "verified") flags.push(sourceStatusLabel(skill.sourceStatus));
+            if (skill.sourceStatus !== "verified" || skill.locallyEdited) flags.push(sourceStatusLabel(skill.sourceStatus, skill.locallyEdited));
             return (index + 1) + ". " + skill.name + " — " + flags.join("; ");
           }).join("\n") : "- Not planned");
         }
@@ -4165,6 +4262,11 @@
       document.getElementById("catalogFile").click();
     });
     document.getElementById("useBundledCatalog").addEventListener("click", useBundledCatalog);
+    document.getElementById("catalogEditMode").addEventListener("click", function () {
+      catalogEditMode = !catalogEditMode;
+      playSound(catalogEditMode ? "switch" : "click");
+      renderApp({ preserveLibraryScroll: true });
+    });
     document.getElementById("catalogFile").addEventListener("change", function (event) {
       importCatalogFile(event.target.files[0]);
       event.target.value = "";
@@ -4212,14 +4314,18 @@
         renderApp();
         return;
       }
+      const action = event.target.closest("[data-action]");
+      const kind = action && action.dataset.action;
+      if (kind === "save-catalog-skill") {
+        updateCatalogSkill(action.dataset.catalogId, action.closest(".skill-card"));
+        return;
+      }
       const card = event.target.closest("[data-catalog-id]");
       if (card) {
         addCatalogSkill(card.dataset.catalogId, undefined, true);
         return;
       }
-      const action = event.target.closest("[data-action]");
       if (!action) return;
-      const kind = action.dataset.action;
       if (kind === "toggle-star") {
         toggleStar(action.dataset.starKey);
         return;
