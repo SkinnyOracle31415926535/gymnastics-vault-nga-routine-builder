@@ -1,18 +1,25 @@
-/* Generated from rulebooks_and_routines/NGA/catalog/nga-2024-2028-aug-2025-candidate.json. Do not edit by hand. */
+/* Generated from rulebooks_and_routines/NGA/catalog/nga-2024-2028-aug-2025-candidate.json with the 4N/5N Mushroom adapter sourced from current-source-index.json. Do not edit by hand. */
 window.NGA_CURRENT_CATALOG = {
   "schemaVersion": "1.0.0",
   "catalogId": "nga-2024-2028-aug-2025-candidate",
-  "catalogVersion": "0.1.0",
+  "catalogVersion": "0.2.0",
   "catalogStatus": "candidate",
   "rulesetId": "nga-mens-2024-2028-aug-2025",
   "title": "NGA 2024–2028 candidate skill catalog",
-  "generatedAt": "2026-07-13",
+  "generatedAt": "2026-07-17",
   "sourceRegister": "../sources/NGA_Source_Register.md",
   "coverage": {
     "levelRules": "verified current NGA source pages",
     "specialEvents": "verified current NGA source pages",
-    "selectableSkills": "historical candidates; every row remains needs_review"
+    "selectableSkills": "historical candidates, with a 4N/5N source-indexed Mushroom candidate set; every row requires coach review"
   },
+  "changeLog": [
+    {
+      "version": "0.2.0",
+      "date": "2026-07-17",
+      "summary": "Replaced historical Mushroom/Pommel-derived candidates with the curated 4N/5N Mushroom source-index set."
+    }
+  ],
   "levelRules": {
     "4N": {
       "status": "verified",
@@ -236,7 +243,7 @@ window.NGA_CURRENT_CATALOG = {
   },
   "knownLegacyConflicts": [
     "Floor Front Handspring was treated as a Super Skill in the historical list but is a FIG A option in the current chart.",
-    "Historical mushroom/pommel rows and finish handling do not safely represent the active mushroom rules.",
+    "Mushroom uses a source-indexed 4N/5N candidate set; custom EG assignment and eligibility remain coach-review items.",
     "Historical Still Rings identifiers include shifted or obsolete rows.",
     "Historical Parallel Bars EG I and EG II mappings can be reversed from the active chart.",
     "Historical High Bar rows include retired or renumbered entries."
@@ -12489,3 +12496,143 @@ window.NGA_CURRENT_CATALOG = {
     }
   ]
 };
+
+/*
+ * The main candidate catalog is historical for most apparatus.  Mushroom is
+ * intentionally adapted from the current source index instead: keep the
+ * source-indexed 4N/5N rows, omit the single 3N special event, and replace
+ * only the historical Mushroom/Pommel-derived entries at load time.
+ */
+(function applyCurrentMushroomSourceIndex(catalog) {
+  var sourceDocument = "nga-mens-2024-2028-aug-2025";
+  var officialUrl = "https://nationalgym.org/wp-content/uploads/2025/08/NGA-Mens-Gymnastics-Technical-Handbook.pdf";
+  var superSkillEligibilityNote = "Mushroom Super Skills are indexed for the 4N/5N element-group curriculum; 3N uses the prescribed circle progression.";
+  var figEligibilityAuthority = "NGA p22 curated PH without pommels/mushroom chart; NGA p10 removes difficulty restrictions for 1N–7N.";
+  var candidateRestriction = "Source-indexed Mushroom candidate; coach review is required before certification.";
+  var rows = [
+    ["nga-2024-2028-mushroom-ss-1-1-front-support-leg-cut","I","","SS","1.1","Front Support—Leg cut",23,"1.1—Front Support—Leg cut"],
+    ["nga-2024-2028-mushroom-ss-1-2-rear-support-leg-cut","I","","SS","1.2","Rear Support—Leg cut",23,"1.2—Rear Support—Leg cut"],
+    ["nga-2024-2028-mushroom-ss-1-3-front-support-straddle","I","","SS","1.3","Front Support—Straddle",23,"1.3—Front Support—Straddle"],
+    ["nga-2024-2028-mushroom-ss-1-4-rear-support-straddle","I","","SS","1.4","Rear Support—Straddle",23,"1.4—Rear Support—Straddle"],
+    ["nga-2024-2028-mushroom-ss-1-5-stride-swing-push-off","I","","SS","1.5","Stride Swing—Push off",23,"1.5—Stride Swing—Push off"],
+    ["nga-2024-2028-mushroom-ss-1-6-fwd-false-scissor-l-side","I","","SS","1.6","FWD False Scissor—L-side",23,"1.6—FWD False Scissor—L-side"],
+    ["nga-2024-2028-mushroom-ss-1-7-fwd-false-scissor-r","I","","SS","1.7","FWD False Scissor—R",23,"1.7—FWD False Scissor—R"],
+    ["nga-2024-2028-mushroom-ss-1-8-rev-false-scissor-l-side","I","","SS","1.8","REV False Scissor—L-side",23,"1.8—REV False Scissor—L-side"],
+    ["nga-2024-2028-mushroom-ss-1-9-rev-false-scissor-r-side","I","","SS","1.9","REV False Scissor—R-side",23,"1.9—REV False Scissor—R-side"],
+    ["nga-2024-2028-mushroom-ss-1-10-single-leg-reverse","I","","SS","1.10","Single leg—Reverse",23,"1.10—Single leg—Reverse"],
+    ["nga-2024-2028-mushroom-ss-1-11-single-leg-kehr","I","","SS","1.11","Single leg—Kehr",23,"1.11—Single leg—Kehr"],
+    ["nga-2024-2028-mushroom-fig-ii-a-1-flair-in-side-support-thomas","I","II","A","1","*Flair in Side Support (Thomas)",22,"FIG 1 — *Flair in Side Support (Thomas) — A"],
+    ["nga-2024-2028-mushroom-fig-ii-a-13-flair-in-cross-support-frontways-on-end","I","II","A","13","*Flair in cross support frontways on end",22,"FIG 13 — *Flair in cross support frontways on end — A"],
+    ["nga-2024-2028-mushroom-fig-ii-a-19-flair-in-cross-support-rearways-on-end","I","II","A","19","*Flair in cross support rearways on end",22,"FIG 19 — *Flair in cross support rearways on end — A"],
+    ["nga-2024-2028-mushroom-fig-ii-c-39-flair-or-circle-to-hs-lower-to-flair-or-c-","I","II","C","39","Flair or Circle to HS, lower to Flair or C Circle [Tippelt]",22,"FIG 39 — Flair or Circle to HS, lower to Flair or C Circle [Tippelt] — C"],
+    ["nga-2024-2028-mushroom-ss-2-1-single-leg-pick-up-thru","II","","SS","2.1","Single leg Pick up—Thru",24,"2.1—Single leg Pick up—Thru"],
+    ["nga-2024-2028-mushroom-ss-2-2-single-leg-pick-up-thru","II","","SS","2.2","Single leg Pick up—Thru",24,"2.2—Single leg Pick up—Thru"],
+    ["nga-2024-2028-mushroom-fig-ii-a-1-circle-in-side-support","II","II","A","1","Circle in Side Support",22,"FIG 1 — Circle in Side Support — A"],
+    ["nga-2024-2028-mushroom-fig-ii-a-13-circle-in-cross-support-frontways-on-end","II","II","A","13","Circle in cross support frontways on end",22,"FIG 13 — Circle in cross support frontways on end — A"],
+    ["nga-2024-2028-mushroom-fig-ii-a-19-circle-in-cross-support-rearways-on-end","II","II","A","19","Circle in cross support rearways on end",22,"FIG 19 — Circle in cross support rearways on end — A"],
+    ["nga-2024-2028-mushroom-fig-ii-a-25-circle-with-1-4-spindle","II","II","A","25","Circle with 1/4 spindle",22,"FIG 25 — Circle with 1/4 spindle — A"],
+    ["nga-2024-2028-mushroom-fig-ii-b-20-circle-in-cross-support-between-tape-3-3","II","II","B","20","Circle in cross support between tape (3-3)",22,"FIG 20 — Circle in cross support between tape (3-3) — B"],
+    ["nga-2024-2028-mushroom-fig-ii-b-26-circle-with-1-2-spindle-in-one-circle","II","II","B","26","Circle with 1/2 spindle (in one circle)",22,"FIG 26 — Circle with 1/2 spindle (in one circle) — B"],
+    ["nga-2024-2028-mushroom-fig-ii-d-28-1-1-spindle-in-side-support-within-2-circl","II","II","D","28","1/1 spindle in side support within 2 circles",22,"FIG 28 — 1/1 spindle in side support within 2 circles — D"],
+    ["nga-2024-2028-mushroom-fig-ii-d-34-1-1-spindle-in-cross-support-within-2-circ","II","II","D","34","1/1 spindle in cross support within 2 circles",22,"FIG 34 — 1/1 spindle in cross support within 2 circles — D"],
+    ["nga-2024-2028-mushroom-fig-ii-e-29-any-1-1-spindle-w-in-2-circles-from-1-3-e-","II","II","E","29","Any 1/1 spindle w/in 2 circles (From 1-3 E to 3-5 to 1-3) [Eichorn]",22,"FIG 29 — Any 1/1 spindle w/in 2 circles (From 1-3 E to 3-5 to 1-3) [Eichorn] — E"],
+    ["nga-2024-2028-mushroom-ss-3-1-single-leg-travel","III","","SS","3.1","Single leg travel",24,"3.1—Single leg travel"],
+    ["nga-2024-2028-mushroom-fig-ii-a-103-180-russian","III","II","A","103","180° Russian",22,"FIG 103 — 180° Russian — A"],
+    ["nga-2024-2028-mushroom-fig-iii-d-82-3-3-travel-with-180-russian-tong-fei","III","III","D","82","3/3 Travel with 180° Russian [Tong Fei]",22,"FIG 82 — 3/3 Travel with 180° Russian [Tong Fei] — D"],
+    ["nga-2024-2028-mushroom-ss-4-1-1-2-180-circle-to-rear","IV","","SS","4.1","1/2 (180°) circle to rear",24,"4.1—1/2 (180°) circle to rear"],
+    ["nga-2024-2028-mushroom-ss-4-1-leg-cut-fwd-1-4-90","IV","","SS","4.1","Leg cut FWD—1/4 (90º)",24,"4.1—Leg cut FWD—1/4 (90º)"],
+    ["nga-2024-2028-mushroom-ss-4-2-half-circle-1-4-90-turn","IV","","SS","4.2","Half—Circle—1/4 (90º) turn",24,"4.2—Half—Circle—1/4 (90º) turn"],
+    ["nga-2024-2028-mushroom-ss-4-3-180-russian-to-wende","IV","","SS","4.3","180° Russian to Wende",24,"4.3—180° Russian to Wende"],
+    ["nga-2024-2028-mushroom-fig-iv-a-1-wende","IV","IV","A","1","Wende",22,"FIG 1 — Wende — A"],
+    ["nga-2024-2028-mushroom-fig-iv-b-8-360-russian-to-wende","IV","IV","B","8","360° Russian to wende",22,"FIG 8 — 360° Russian to wende — B"],
+    ["nga-2024-2028-mushroom-fig-iv-c-9-720-russian-to-wende","IV","IV","C","9","720° Russian to wende",22,"FIG 9 — 720° Russian to wende — C"],
+    ["nga-2024-2028-mushroom-fig-iv-c-20-circle-or-flair-to-hs-special-val-for-hs-w","IV","IV","C","20","*Circle or flair to HS (Special VAL for HS with no turn or travel) *See FIG Jr COP for HS turn/travel principles",22,"FIG 20 — *Circle or flair to HS (Special VAL for HS with no turn or travel) *See FIG Jr COP for HS turn/travel principles — C"],
+    ["nga-2024-2028-mushroom-fig-iv-d-4-circle-flair-to-hs-w-3-3-travel-450-turn","IV","IV","D","4","Circle / Flair to HS w 3/3 travel & 450º turn",22,"FIG 4 — Circle / Flair to HS w 3/3 travel & 450º turn — D"],
+    ["nga-2024-2028-mushroom-fig-iv-d-10-1080-russian-to-wende","IV","IV","D","10","1080° Russian to wende",22,"FIG 10 — 1080° Russian to wende — D"],
+    ["nga-2024-2028-mushroom-fig-iii-a-1-1-2-fwd-side-travel","","III","A","1","1/2 FWD side travel",22,"FIG 1 — 1/2 FWD side travel — A"],
+    ["nga-2024-2028-mushroom-fig-iii-a-13-1-2-bwd-side-travel","","III","A","13","1/2 BWD side travel",22,"FIG 13 — 1/2 BWD side travel — A"],
+    ["nga-2024-2028-mushroom-fig-ii-a-61-double-rear-kehr","","II","A","61","Double Rear [Kehr]",22,"FIG 61 — Double Rear [Kehr] — A"],
+    ["nga-2024-2028-mushroom-fig-ii-a-79-front-out-or-in","","II","A","79","Front out or in",22,"FIG 79 — Front out or in — A"],
+    ["nga-2024-2028-mushroom-fig-ii-a-91-schwabenflank","","II","A","91","Schwabenflank",22,"FIG 91 — Schwabenflank — A"],
+    ["nga-2024-2028-mushroom-fig-iii-b-2-3-3-fwd-side-travel","","III","B","2","3/3 FWD side travel",22,"FIG 2 — 3/3 FWD side travel — B"],
+    ["nga-2024-2028-mushroom-fig-iii-b-14-3-3-bwd-side-travel","","III","B","14","3/3 BWD side travel",22,"FIG 14 — 3/3 BWD side travel — B"],
+    ["nga-2024-2028-mushroom-fig-iii-b-33-1-2-side-travel-with-1-2-spindle","","III","B","33","1/2 Side travel with 1/2 spindle",22,"FIG 33 — 1/2 Side travel with 1/2 spindle — B"],
+    ["nga-2024-2028-mushroom-fig-iii-b-44-1-2-fwd-cross-support-travel","","III","B","44","1/2 FWD cross support travel",22,"FIG 44 — 1/2 FWD cross support travel — B"],
+    ["nga-2024-2028-mushroom-fig-ii-b-50-direct-stockli-a","","II","B","50","Direct Stockli-A",22,"FIG 50 — Direct Stockli-A — B"],
+    ["nga-2024-2028-mushroom-fig-iii-b-56-1-2-bwd-cross-support-travel","","III","B","56","1/2 BWD cross support travel",22,"FIG 56 — 1/2 BWD cross support travel — B"],
+    ["nga-2024-2028-mushroom-fig-ii-b-80-reverse-stockli","","II","B","80","Reverse Stockli",22,"FIG 80 — Reverse Stockli — B"],
+    ["nga-2024-2028-mushroom-fig-ii-b-86-swiss-hop","","II","B","86","Swiss hop",22,"FIG 86 — Swiss hop — B"],
+    ["nga-2024-2028-mushroom-fig-ii-b-92-czechkehr","","II","B","92","Czechkehr",22,"FIG 92 — Czechkehr — B"],
+    ["nga-2024-2028-mushroom-fig-ii-b-104-360-russian","","II","B","104","360° Russian",22,"FIG 104 — 360° Russian — B"],
+    ["nga-2024-2028-mushroom-fig-iii-c-27-1-2-travel-w-1-2-spindle-side-cross-suppor","","III","C","27","1/2 travel w 1/2 spindle (side/cross support)",22,"FIG 27 — 1/2 travel w 1/2 spindle (side/cross support) — C"],
+    ["nga-2024-2028-mushroom-fig-ii-c-105-720-russian","","II","C","105","720° Russian",22,"FIG 105 — 720° Russian — C"],
+    ["nga-2024-2028-mushroom-fig-iii-d-46-3-3-fwd-cross-support-travel-magyar","","III","D","46","3/3 FWD cross support travel [Magyar]",22,"FIG 46 — 3/3 FWD cross support travel [Magyar] — D"],
+    ["nga-2024-2028-mushroom-fig-iii-d-58-3-3-bwd-cross-support-travel-sivado","","III","D","58","3/3 BWD cross support travel [Sivado]",22,"FIG 58 — 3/3 BWD cross support travel [Sivado] — D"],
+    ["nga-2024-2028-mushroom-fig-iii-d-70-kehr-reverse-stockli-kehr-moguilny","","III","D","70","Kehr - Reverse Stockli – Kehr [Moguilny]",22,"FIG 70 — Kehr - Reverse Stockli – Kehr [Moguilny] — D"],
+    ["nga-2024-2028-mushroom-fig-iii-d-71-reverse-stockli-kehr-reverse-stockli-belen","","III","D","71","Reverse Stockli – Kehr – Reverse Stockli [Belenki]",22,"FIG 71 — Reverse Stockli – Kehr – Reverse Stockli [Belenki] — D"],
+    ["nga-2024-2028-mushroom-fig-iii-d-88-3-3-travel-with-360-russian-roth","","III","D","88","3/3 Travel with 360° Russian [Roth]",22,"FIG 88 — 3/3 Travel with 360° Russian [Roth] — D"],
+    ["nga-2024-2028-mushroom-fig-ii-d-105-1080-russian","","II","D","105","1080° Russian",22,"FIG 105 — 1080° Russian — D"],
+    ["nga-2024-2028-mushroom-fig-iii-e-29-3-3-side-travel-with-1-1-spindle","","III","E","29","3/3 Side travel with 1/1 spindle",22,"FIG 29 — 3/3 Side travel with 1/1 spindle — E"],
+    ["nga-2024-2028-mushroom-fig-iii-e-35-3-3-cross-travel-with-1-2-spindle-in-one-c","","III","E","35","3/3 Cross travel with 1/2 spindle (in one circle) [Nin Reyes]",22,"FIG 35 — 3/3 Cross travel with 1/2 spindle (in one circle) [Nin Reyes] — E"],
+    ["nga-2024-2028-mushroom-fig-iii-e-89-3-3-travel-with-720-russian-wu","","III","E","89","3/3 Travel with 720° Russian [Wu]",22,"FIG 89 — 3/3 Travel with 720° Russian [Wu] — E"],
+  ];
+
+  var mushroomSkills = rows.map(function (row) {
+    var id = row[0];
+    var elementGroup = row[1];
+    var figElementGroup = row[2];
+    var value = row[3];
+    var sourceCode = row[4];
+    var sourceNameFragment = row[5];
+    var page = row[6];
+    var evidence = row[7];
+    var isSuperSkill = value === "SS";
+    var skill = {
+      id: id,
+      apparatus: "mushroom",
+      elementGroup: elementGroup || null,
+      sourceNameFragment: sourceNameFragment,
+      aliases: [],
+      classification: isSuperSkill ? "nga_super_skill" : "nga_mushroom_eligible_fig_element",
+      value: value,
+      kind: value,
+      figValue: isSuperSkill ? null : value,
+      ngaAwardedValue: value,
+      sourceCode: sourceCode,
+      name: sourceNameFragment,
+      elementGroups: elementGroup ? [elementGroup] : [],
+      countsAsSkill: true,
+      isDismount: elementGroup === "IV",
+      repeatKey: id,
+      applicableLevels: ["4N", "5N"],
+      restrictions: [candidateRestriction, isSuperSkill ? superSkillEligibilityNote : figEligibilityAuthority],
+      status: "candidate",
+      sourceStatus: "needs_review",
+      reviewedAt: null,
+      source: {
+        document: sourceDocument,
+        page: page,
+        officialUrl: officialUrl,
+        evidence: evidence
+      },
+      reviewStatus: isSuperSkill ? "source_indexed_needs_coach_display_name_review" : "source_indexed_needs_coach_display_name_and_custom_eg_review"
+    };
+    if (figElementGroup) skill.figElementGroup = figElementGroup;
+    if (isSuperSkill) skill.eligibilityNote = superSkillEligibilityNote;
+    else skill.eligibilityAuthority = figEligibilityAuthority;
+    return skill;
+  });
+
+  var inserted = false;
+  catalog.skills = catalog.skills.reduce(function (nextSkills, skill) {
+    if (skill.apparatus !== "mushroom") {
+      nextSkills.push(skill);
+      return nextSkills;
+    }
+    if (!inserted) {
+      Array.prototype.push.apply(nextSkills, mushroomSkills);
+      inserted = true;
+    }
+    return nextSkills;
+  }, []);
+})(window.NGA_CURRENT_CATALOG);
