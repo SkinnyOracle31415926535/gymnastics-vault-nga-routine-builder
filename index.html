@@ -2349,6 +2349,19 @@
       .topbar { padding: 15px 11px; }
     }
 
+    /* Keep the middle Routine Sequence panel inside the planner at every width. */
+    .planner-grid { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr) minmax(0, .9fr); }
+    .routine-item { grid-template-columns: 31px minmax(0, 1fr); }
+    .routine-name, .routine-controls { min-width: 0; overflow-wrap: anywhere; }
+    .routine-controls {
+      grid-column: 2;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    .routine-controls .check-inline { min-width: 0; white-space: normal; }
+    .routine-controls input[type="text"] { width: min(100%, 12rem); min-width: 0; }
+
     @media print {
       body { background: #ffffff; color: #000000; }
       .browser-chrome, .marquee-window, .control-panel, .notice, .tabs, .saved, .action-row, .library-panel, .routine-controls, .footer-note { display: none !important; }
@@ -2429,6 +2442,7 @@
         <button class="button primary" id="applySavedRoutine" type="button">Use saved routine</button>
         <button class="button quiet" id="saveRoutineAsNew" type="button">Save this as new</button>
         <button class="button quiet" id="saveRoutineToAll" type="button">Save changes to all instances</button>
+        <button class="button danger" id="deleteSavedRoutine" type="button">Delete saved routine</button>
       </div>
       <div class="action-row export-actions">
         <button class="button primary" id="exportSummary" type="button">Download summary</button>
@@ -3262,6 +3276,29 @@
       renderApp();
     }
 
+    function deleteSavedRoutine() {
+      const template = selectedRoutineTemplate();
+      if (!template) {
+        window.alert("Choose the saved routine type you want to delete first.");
+        return;
+      }
+      const linkedAthletes = savedRoutineAssignments(template.id);
+      const linkedNames = linkedAthletes.map(function (athlete) { return athlete.name; }).join(", ");
+      const detail = linkedAthletes.length
+        ? " It will be unlinked from " + linkedNames + ", but each athlete’s editable routine draft will be kept."
+        : "";
+      if (!window.confirm("Delete saved routine “" + template.name + "”?" + detail)) return;
+
+      state.routineLibrary = state.routineLibrary.filter(function (routine) { return routine.id !== template.id; });
+      linkedAthletes.forEach(function (athlete) {
+        state.athletes[athlete.id].routineTemplateId = "";
+        state.athletes[athlete.id].routineTemplateSyncedAt = "";
+      });
+      playSound("remove");
+      saveState("Deleted saved routine “" + template.name + "”");
+      renderApp();
+    }
+
     function saveState(message) {
       try {
         const athlete = currentAthlete();
@@ -3387,6 +3424,7 @@
       const hasSavedRoutine = Boolean(selectedRoutineTemplate());
       document.getElementById("applySavedRoutine").disabled = !hasSavedRoutine;
       document.getElementById("saveRoutineToAll").disabled = !hasSavedRoutine;
+      document.getElementById("deleteSavedRoutine").disabled = !hasSavedRoutine;
     }
 
     function catalogLabel() {
@@ -4653,6 +4691,7 @@
     document.getElementById("applySavedRoutine").addEventListener("click", applySavedRoutine);
     document.getElementById("saveRoutineAsNew").addEventListener("click", saveRoutineAsNew);
     document.getElementById("saveRoutineToAll").addEventListener("click", saveRoutineToAllInstances);
+    document.getElementById("deleteSavedRoutine").addEventListener("click", deleteSavedRoutine);
 
     eventTabs.addEventListener("click", function (event) {
       const tab = event.target.closest("[data-event]");
