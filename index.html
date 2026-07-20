@@ -2348,89 +2348,83 @@
       .shell, .topbar, .workspace, .progress, .panel, .routine-item, .decision, .event-special, .panel-body { width: 100%; color: #000000; background: #ffffff; box-shadow: none; }
       h1, h2, h3, .progress-name, .routine-name, .decision-title { color: #000000; text-shadow: none; }
     }
-    /* Read-only routine book: a glossy Y2K cyber dashboard on screen, clean on paper. */
+    /* Read-only routine book: deliberately literal turn-of-the-millennium web UI. */
     body.print-view-active {
-      background-color: #05032e;
-      background-image:
-        radial-gradient(circle at 12% 9%, rgba(0, 255, 225, .34), transparent 18rem),
-        radial-gradient(circle at 89% 16%, rgba(255, 0, 185, .34), transparent 21rem),
-        linear-gradient(rgba(105, 113, 255, .18) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(105, 113, 255, .18) 1px, transparent 1px);
-      background-size: auto, auto, 24px 24px, 24px 24px;
+      background-color: #000080;
+      background-image: radial-gradient(#fff 1px, transparent 1.5px);
+      background-size: 19px 19px;
     }
 
     body.print-view-active .workspace {
-      border: 3px ridge #b5ceff;
-      background:
-        linear-gradient(90deg, rgba(0, 255, 220, .14), transparent 22%, transparent 78%, rgba(255, 0, 174, .14)),
-        #070845;
-      box-shadow: 8px 8px 0 #02011e, 0 0 24px rgba(0, 242, 255, .45);
+      border: 4px ridge #c0c0c0;
+      background: #c0c0c0;
+      box-shadow: 6px 6px 0 #000;
     }
 
     .routine-book {
       display: grid;
-      gap: 22px;
+      gap: 10px;
+      font-family: "Courier New", Courier, monospace;
     }
 
     .routine-book-heading {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 16px;
-      padding: 15px 17px;
-      border: 3px ridge #d3e2ff;
-      color: #eaffff;
-      background: linear-gradient(100deg, #15199b, #5936c4 48%, #d90b91);
-      box-shadow: inset 0 0 0 2px rgba(0, 255, 230, .4), 4px 4px 0 #00012e;
+      gap: 10px;
+      padding: 22px 10px 10px;
+      border: 3px outset #f5f5f5;
+      color: #fff;
+      background: #0000a0;
+      box-shadow: 2px 2px 0 #000;
+      position: relative;
     }
 
-    .routine-book-heading p { margin: 6px 0 0; }
-    .routine-book-heading h2 { color: #fff; text-shadow: 2px 2px 0 #1121a1, 4px 4px 0 #ff00ab; }
-    .routine-book-heading .muted { color: #d7ffff; }
+    .routine-book-heading::before {
+      position: absolute;
+      top: 3px;
+      left: 4px;
+      right: 4px;
+      padding: 2px 5px;
+      color: #fff;
+      background: #00007a;
+      content: "[ NGA ROUTINE FILES.EXE ]  ★  ONLINE  ★";
+      font-family: Tahoma, Verdana, sans-serif;
+      font-size: .65rem;
+      font-weight: bold;
+      letter-spacing: .06em;
+    }
+
+    .routine-book-heading p { margin: 5px 0 0; }
+    .routine-book-heading h2 { color: #ffff00; font-family: "Arial Black", Impact, sans-serif; font-size: 1.35rem; text-shadow: 2px 2px #f000a8; }
+    .routine-book-heading .muted { color: #fff; font-family: Verdana, Geneva, sans-serif; font-size: .74rem; }
 
     .routine-book-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px;
+      gap: 10px;
     }
 
     .routine-book-card {
       break-inside: avoid;
       page-break-inside: avoid;
-      position: relative;
-      overflow: hidden;
-      border: 3px ridge #d5eaff;
-      padding: 16px;
-      color: #17175a;
-      background:
-        linear-gradient(135deg, rgba(255, 255, 255, .96), rgba(217, 255, 254, .88) 45%, rgba(237, 222, 255, .9)),
-        #fff;
-      box-shadow: 5px 5px 0 #00013c, 0 0 13px rgba(0, 242, 255, .45);
+      border: 3px outset #fff;
+      padding: 10px;
+      color: #000080;
+      background: #ffffcc;
+      box-shadow: 3px 3px 0 #000;
     }
 
-    .routine-book-card::before {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 74px;
-      height: 74px;
-      border-left: 2px solid rgba(0, 214, 225, .55);
-      border-bottom: 2px solid rgba(0, 214, 225, .55);
-      background: linear-gradient(135deg, rgba(255, 0, 179, .78), rgba(0, 241, 225, .18));
-      content: "";
-      clip-path: polygon(100% 0, 100% 100%, 0 0);
-    }
-
-    .routine-book-card h3 { position: relative; margin: 0; color: #1712a3; text-shadow: 1px 1px 0 #fff, 2px 2px 0 #6feeff; }
-    .routine-book-meta { margin: 5px 0 14px; color: #48207f; font-size: .84rem; font-weight: 800; }
-    .routine-book-event + .routine-book-event { margin-top: 14px; padding-top: 13px; border-top: 1px dashed #7286c7; }
-    .routine-book-event h4 { margin: 0 0 7px; color: #142bb4; font-size: .95rem; text-transform: uppercase; letter-spacing: .06em; }
-    .routine-book-list { margin: 0; padding-left: 24px; line-height: 1.48; }
+    .routine-book-card h3 { margin: 0; padding: 3px 5px; border: 2px inset #fff; color: #fff; background: #008080; font-family: Tahoma, Verdana, sans-serif; font-size: .9rem; }
+    .routine-book-meta { margin: 6px 0 9px; color: #000; font-family: Verdana, Geneva, sans-serif; font-size: .72rem; font-weight: 800; }
+    .routine-book-event + .routine-book-event { margin-top: 9px; padding-top: 8px; border-top: 2px dotted #0000aa; }
+    .routine-book-event h4 { margin: 0 0 5px; padding: 2px 4px; color: #fff; background: #9b008d; font-family: "Arial Black", Impact, sans-serif; font-size: .72rem; letter-spacing: .04em; }
+    .routine-book-list { margin: 0; padding-left: 22px; line-height: 1.35; font-size: .84rem; }
     .routine-book-list li + li { margin-top: 3px; }
-    .routine-book-list li::marker { color: #f0009c; font-weight: 900; }
-    .routine-book-empty, .routine-book-notes { margin: 0; color: #34246f; font-size: .84rem; line-height: 1.4; }
-    .routine-book-notes { margin-top: 8px; padding: 7px 8px; border-left: 3px solid #ff20aa; background: rgba(229, 206, 255, .55); }
-    .routine-book-card .routine-book-meta { margin-bottom: 0; font-size: .76rem; }
+    .routine-book-list li::marker { color: #f000a8; font-weight: 900; }
+    .routine-book-empty, .routine-book-notes { margin: 0; color: #000; font-size: .78rem; line-height: 1.35; }
+    .routine-book-notes { margin-top: 7px; padding: 5px; border: 2px inset #fff; background: #c0ffff; }
+    .routine-book-card .routine-book-meta { margin-bottom: 0; font-size: .7rem; }
 
     body.print-view-active .control-panel,
     body.print-view-active .notice,
