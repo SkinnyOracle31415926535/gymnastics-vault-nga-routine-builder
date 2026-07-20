@@ -2342,6 +2342,62 @@
     .routine-controls .check-inline { min-width: 0; white-space: normal; }
     .routine-controls input[type="text"] { width: min(100%, 12rem); min-width: 0; }
 
+    .skill-card-actions { display: flex; align-items: flex-start; gap: 5px; }
+    .skill-card > .library-editor { grid-column: 1 / -1; }
+    .skill-full-name, .routine-full-name {
+      display: block;
+      margin-top: 3px;
+      color: #333333;
+      font-size: .7rem;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+    .library-editor {
+      margin-top: 2px;
+      padding: 10px;
+      border: 2px inset #ffffff;
+      background: #e9e9e9;
+    }
+    .library-source {
+      margin-bottom: 8px;
+      padding: 7px;
+      border: 1px dotted #000080;
+      color: #222222;
+      background: #ffffcc;
+      font-family: "Courier New", monospace;
+      font-size: .69rem;
+      line-height: 1.35;
+    }
+    .library-editor-grid, .library-add-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(110px, .55fr) minmax(110px, .55fr);
+      gap: 7px;
+    }
+    .library-editor-grid .field { min-width: 0; }
+    .library-editor-grid .field input, .library-editor-grid .field select, .library-add-grid input, .library-add-grid select {
+      width: 100%;
+      min-width: 0;
+    }
+    .library-levels, .personal-levels {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 0;
+      color: #000000;
+      font-size: .75rem;
+      font-weight: 700;
+    }
+    .personal-levels { padding: 0 10px 10px; }
+    .library-editor-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .routine-title-control input[type="text"] { width: min(100%, 12rem); }
+
+    @media (max-width: 760px) {
+      .library-editor-grid, .library-add-grid { grid-template-columns: 1fr; }
+      .skill-card-actions { flex-wrap: wrap; }
+      .routine-title-control { width: 100%; }
+    }
+
     @media print {
       body { background: #ffffff; color: #000000; }
       .browser-chrome, .marquee-window, .control-panel, .notice, .tabs, .saved, .action-row, .library-panel, .routine-controls, .footer-note { display: none !important; }
@@ -2575,7 +2631,7 @@
     "use strict";
 
     const APP_KEY = "nga-routine-builder-v1";
-    const APP_VERSION = "1.3.0";
+    const APP_VERSION = "1.4.0";
     const STUDENTS = [
       { id: "benjamin-bowie-christopher", name: "Benjamin Bowie Christopher" },
       { id: "kenneth-chan", name: "Kenneth Chan" },
@@ -2899,7 +2955,8 @@
       return snapshot.catalogId || snapshot.rulesetId || snapshot.sourceLabel ? snapshot : null;
     }
 
-    let state = loadState();
+    let state = null;
+    state = loadState();
     let currentEvent = state.lastEvent && EVENTS[state.lastEvent] ? state.lastEvent : "overview";
     let draggedPayload = null;
     const filtersByEvent = {};
@@ -5051,6 +5108,960 @@
         renderApp();
       }
       draggedPayload = null;
+    });
+
+    /*
+      Editable library layer. Catalog records remain cited source snapshots;
+      personal records and local overrides live beside them so catalog updates
+      never erase a coach's drafts, titles, or backups.
+    */
+    let libraryEditorId = "";
+
+    function hasOwn(object, property) {
+      return Boolean(object) && Object.prototype.hasOwnProperty.call(object, property);
+    }
+
+    function cleanTitle(value) {
+      return typeof value === "string" ? value.trim().slice(0, 90) : "";
+    }
+
+    function normalizeApplicableLevels(raw) {
+      const values = Array.isArray(raw) ? raw : [];
+      return ["4N", "5N"].filter(function (level) { return values.map(String).indexOf(level) !== -1; });
+    }
+
+    function isKnownSkillKind(value) {
+      const kind = normalizeKind(value);
+      return kind === "SS" || isFIGKind(kind);
+    }
+
+    function normalizeCitationList(raw) {
+      const values = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+      return values.filter(function (item) { return typeof item === "string" || isObject(item); }).slice(0, 12).map(function (item) {
+        return isObject(item) ? Object.assign({}, item) : String(item).slice(0, 500);
+      });
+    }
+
+    function normalizeCatalogSkill(raw, index, catalogStatus) {
+      if (!isObject(raw) || !raw.name) return null;
+      const rawKind = raw.kind || raw.figValue || raw.skillLevel || raw.classification || raw.value || "";
+      const kind = normalizeKind(rawKind);
+      const egCandidate = Array.isArray(raw.elementGroups) ? raw.elementGroups[0] : Array.isArray(raw.eligibleEGs) ? raw.eligibleEGs[0] : (raw.eg || raw.elementGroup || "");
+      const apparatus = normalizeApparatus(raw.apparatus || raw.event || "");
+      if (!kind || !apparatus) return null;
+      const source = isObject(raw.source) ? Object.assign({}, raw.source) : null;
+      const sourceHasPage = Boolean(source && (source.page || (Array.isArray(source.pages) && source.pages.length)));
+      const verified = catalogStatus === "verified" && raw.status === "verified" && sourceHasPage;
+      const id = String(raw.id || raw.catalogId || "candidate-" + apparatus + "-" + index);
+      const reviewStatus = String(raw.reviewStatus || raw.candidateStatus || "").slice(0, 180);
+      const citations = normalizeCitationList(raw.citations || raw.citation);
+      let sourceStatus = verified ? "verified" : String(raw.sourceStatus || "").toLowerCase();
+      if (!sourceStatus) sourceStatus = raw.status === "legacy" ? "legacy" : "needs_review";
+      if (sourceStatus !== "verified" && sourceStatus !== "legacy" && sourceStatus !== "needs_review" && sourceStatus !== "source_indexed") sourceStatus = "needs_review";
+      if (!verified && (reviewStatus || raw.eligibilityNote || raw.eligibilityAuthority || citations.length)) sourceStatus = "source_indexed";
+      const eg = normalizeEG(egCandidate);
+      return {
+        id: id,
+        catalogId: id,
+        repeatKey: String(raw.repeatKey || raw.id || normalizeText(raw.name)),
+        name: String(raw.name).slice(0, 180),
+        displayTitle: cleanTitle(raw.displayTitle || raw.shortTitle),
+        apparatus: apparatus,
+        kind: kind,
+        code: String(raw.sourceCode || raw.code || raw.figCodeId || ""),
+        eg: eg,
+        plannedEg: eg,
+        sourceStatus: sourceStatus,
+        sourceNote: sourceNoteFrom(raw),
+        source: source,
+        citations: citations,
+        reviewStatus: reviewStatus,
+        eligibilityNote: String(raw.eligibilityNote || "").slice(0, 600),
+        eligibilityAuthority: String(raw.eligibilityAuthority || "").slice(0, 600),
+        isDismount: raw.isDismount === undefined ? eg === "IV" : Boolean(raw.isDismount),
+        countsAsSkill: raw.countsAsSkill !== false,
+        variant: String(raw.variant || "").slice(0, 80),
+        ruleConditionConfirmed: Boolean(raw.ruleConditionConfirmed),
+        applicableLevels: normalizeApplicableLevels(raw.applicableLevels),
+        restrictions: Array.isArray(raw.restrictions) ? raw.restrictions.slice(0, 8).map(String) : [],
+        custom: Boolean(raw.custom),
+        personal: false
+      };
+    }
+
+    function normalizePersonalSkill(raw, index) {
+      if (!isObject(raw) || !raw.name) return null;
+      const name = String(raw.name).trim().slice(0, 180);
+      const apparatus = normalizeApparatus(raw.apparatus || raw.event || "");
+      if (!name || !apparatus) return null;
+      const id = String(raw.id || raw.catalogId || "personal-" + index).slice(0, 180);
+      const kind = normalizeKind(raw.kind || raw.figValue || raw.value || "") || "Unknown";
+      const eg = normalizeEG(raw.eg || raw.elementGroup || raw.plannedEg || "");
+      return {
+        id: id,
+        catalogId: id,
+        repeatKey: String(raw.repeatKey || "personal-" + normalizeText(name)).slice(0, 260),
+        name: name,
+        displayTitle: cleanTitle(raw.displayTitle || raw.shortTitle),
+        apparatus: apparatus,
+        kind: kind,
+        code: String(raw.code || "personal").slice(0, 80),
+        eg: eg,
+        plannedEg: eg,
+        sourceStatus: "personal",
+        sourceNote: String(raw.sourceNote || "Personal library skill").slice(0, 600),
+        source: null,
+        citations: [],
+        reviewStatus: "personal",
+        eligibilityNote: String(raw.eligibilityNote || "").slice(0, 600),
+        eligibilityAuthority: "",
+        isDismount: eg === "IV",
+        countsAsSkill: raw.countsAsSkill !== false,
+        variant: "",
+        ruleConditionConfirmed: false,
+        applicableLevels: normalizeApplicableLevels(raw.applicableLevels),
+        restrictions: Array.isArray(raw.restrictions) ? raw.restrictions.slice(0, 8).map(String) : ["Personal library skill"],
+        custom: true,
+        personal: true
+      };
+    }
+
+    function normalizeSkillOverride(raw) {
+      if (!isObject(raw)) return null;
+      const override = {};
+      if (hasOwn(raw, "displayTitle")) override.displayTitle = cleanTitle(raw.displayTitle);
+      if (hasOwn(raw, "kind")) override.kind = normalizeKind(raw.kind) || "Unknown";
+      if (hasOwn(raw, "eg")) override.eg = normalizeEG(raw.eg);
+      if (hasOwn(raw, "applicableLevels")) override.applicableLevels = normalizeApplicableLevels(raw.applicableLevels);
+      return Object.keys(override).length ? override : null;
+    }
+
+    function defaultState() {
+      return {
+        appVersion: APP_VERSION,
+        lastAthlete: STUDENTS[0].id,
+        lastEvent: "overview",
+        catalog: bundledCatalog(),
+        personalSkills: [],
+        skillOverrides: {},
+        favoriteSkillKeys: [],
+        favoriteSeedSignatures: [],
+        soundEnabled: true,
+        routineLibrary: [],
+        athletes: {}
+      };
+    }
+
+    function normalizeAthlete(raw) {
+      const athlete = emptyAthlete();
+      if (!raw || typeof raw !== "object") return athlete;
+      athlete.level = raw.level === "4N" || raw.level === "5N" ? raw.level : "";
+      athlete.status = ["draft", "ready_for_review", "validated"].indexOf(raw.status) !== -1 ? raw.status : "draft";
+      athlete.catalogSnapshot = normalizeCatalogSnapshot(raw.catalogSnapshot);
+      athlete.updatedAt = typeof raw.updatedAt === "string" ? raw.updatedAt : "";
+      athlete.routineTemplateId = typeof raw.routineTemplateId === "string" ? raw.routineTemplateId.slice(0, 160) : "";
+      athlete.routineTemplateSyncedAt = typeof raw.routineTemplateSyncedAt === "string" ? raw.routineTemplateSyncedAt : "";
+      Object.keys(athlete.events).forEach(function (eventId) {
+        const source = raw.events && raw.events[eventId] ? raw.events[eventId] : {};
+        athlete.events[eventId].skills = Array.isArray(source.skills) ? source.skills.map(normalizeStoredSkill).filter(Boolean) : [];
+        athlete.events[eventId].notes = typeof source.notes === "string" ? source.notes : "";
+        athlete.events[eventId].special = normalizeEventSpecial(source.special);
+      });
+      return athlete;
+    }
+
+    function loadState() {
+      const fallback = defaultState();
+      try {
+        const raw = localStorage.getItem(APP_KEY);
+        if (!raw) return fallback;
+        const saved = JSON.parse(raw);
+        if (!saved || typeof saved !== "object") return fallback;
+        fallback.lastAthlete = STUDENTS.some(function (student) { return student.id === saved.lastAthlete; }) ? saved.lastAthlete : fallback.lastAthlete;
+        fallback.lastEvent = EVENTS[saved.lastEvent] ? saved.lastEvent : fallback.lastEvent;
+        fallback.favoriteSkillKeys = Array.isArray(saved.favoriteSkillKeys) ? saved.favoriteSkillKeys.filter(function (key) { return typeof key === "string" && key.length < 300; }) : [];
+        fallback.favoriteSeedSignatures = Array.isArray(saved.favoriteSeedSignatures) ? saved.favoriteSeedSignatures.filter(function (signature) { return typeof signature === "string" && signature.length < 600; }).slice(-12) : [];
+        fallback.soundEnabled = saved.soundEnabled !== false;
+        fallback.personalSkills = Array.isArray(saved.personalSkills) ? saved.personalSkills.map(normalizePersonalSkill).filter(Boolean).slice(-400) : [];
+        fallback.skillOverrides = {};
+        if (isObject(saved.skillOverrides)) {
+          Object.keys(saved.skillOverrides).slice(0, 1200).forEach(function (id) {
+            const override = normalizeSkillOverride(saved.skillOverrides[id]);
+            if (override) fallback.skillOverrides[String(id).slice(0, 180)] = override;
+          });
+        }
+        fallback.routineLibrary = Array.isArray(saved.routineLibrary) ? saved.routineLibrary.map(normalizeRoutineTemplate).filter(Boolean).slice(-80) : [];
+        if (saved.catalog && Array.isArray(saved.catalog.skills)) {
+          const savedCatalog = normalizeCatalog(saved.catalog, saved.catalog.sourceLabel || "Saved local catalog");
+          const savedWasBundled = String(savedCatalog.sourceLabel || saved.catalog.sourceLabel || "") === "Bundled current catalog";
+          if (!savedWasBundled && savedCatalog.status !== "none") fallback.catalog = savedCatalog;
+        }
+        if (saved.athletes && typeof saved.athletes === "object") {
+          STUDENTS.forEach(function (student) {
+            if (saved.athletes[student.id]) fallback.athletes[student.id] = normalizeAthlete(saved.athletes[student.id]);
+          });
+        }
+        const savedRoutineIds = fallback.routineLibrary.map(function (routine) { return routine.id; });
+        Object.keys(fallback.athletes).forEach(function (athleteId) {
+          if (savedRoutineIds.indexOf(fallback.athletes[athleteId].routineTemplateId) === -1) {
+            fallback.athletes[athleteId].routineTemplateId = "";
+            fallback.athletes[athleteId].routineTemplateSyncedAt = "";
+          }
+        });
+        return fallback;
+      } catch (error) {
+        return fallback;
+      }
+    }
+
+    function normalizeStoredSkill(raw) {
+      if (!raw || typeof raw !== "object" || !raw.name) return null;
+      const kind = normalizeKind(raw.kind || raw.figValue || raw.value || "");
+      const eg = normalizeEG(raw.eg || raw.elementGroup || raw.plannedEg || "");
+      return {
+        id: String(raw.id || raw.catalogId || uniqueId("skill")),
+        catalogId: String(raw.catalogId || raw.id || ""),
+        repeatKey: String(raw.repeatKey || raw.catalogId || raw.id || normalizeText(raw.name)),
+        name: String(raw.name).slice(0, 180),
+        displayTitle: cleanTitle(raw.displayTitle || raw.shortTitle),
+        titleOverride: cleanTitle(raw.titleOverride),
+        apparatus: normalizeApparatus(raw.apparatus || ""),
+        kind: kind || "Unknown",
+        code: String(raw.code || raw.sourceCode || ""),
+        eg: eg,
+        plannedEg: eg,
+        sourceStatus: String(raw.sourceStatus || raw.status || "needs_review"),
+        sourceNote: String(raw.sourceNote || ""),
+        source: isObject(raw.source) ? Object.assign({}, raw.source) : null,
+        citations: normalizeCitationList(raw.citations || raw.citation),
+        reviewStatus: String(raw.reviewStatus || "").slice(0, 180),
+        eligibilityNote: String(raw.eligibilityNote || "").slice(0, 600),
+        eligibilityAuthority: String(raw.eligibilityAuthority || "").slice(0, 600),
+        isDismount: raw.isDismount === undefined ? eg === "IV" : Boolean(raw.isDismount),
+        countsAsSkill: raw.countsAsSkill !== false,
+        variant: String(raw.variant || "").slice(0, 80),
+        ruleConditionConfirmed: Boolean(raw.ruleConditionConfirmed),
+        applicableLevels: normalizeApplicableLevels(raw.applicableLevels),
+        restrictions: Array.isArray(raw.restrictions) ? raw.restrictions.slice(0, 8).map(String) : [],
+        catalogVersion: String(raw.catalogVersion || ""),
+        rulesetId: String(raw.rulesetId || ""),
+        spotted: Boolean(raw.spotted),
+        custom: Boolean(raw.custom),
+        personal: Boolean(raw.personal)
+      };
+    }
+
+    function baseCatalogSkillById(id) {
+      if (!state || !state.catalog || !Array.isArray(state.catalog.skills)) return null;
+      return state.catalog.skills.find(function (skill) { return skill.id === id || skill.catalogId === id; }) || null;
+    }
+
+    function applySkillOverride(base) {
+      if (!base) return null;
+      const override = state && state.skillOverrides ? state.skillOverrides[base.id] : null;
+      const skill = Object.assign({}, base);
+      if (override) {
+        if (hasOwn(override, "displayTitle")) skill.displayTitle = override.displayTitle;
+        if (hasOwn(override, "kind")) skill.kind = override.kind;
+        if (hasOwn(override, "eg")) skill.eg = override.eg;
+        if (hasOwn(override, "applicableLevels")) skill.applicableLevels = override.applicableLevels.slice();
+      }
+      skill.plannedEg = skill.eg;
+      skill.isDismount = Boolean(skill.eg === "IV" && isKnownSkillKind(skill.kind) && skill.applicableLevels && skill.applicableLevels.length);
+      return skill;
+    }
+
+    function librarySkills() {
+      const catalogSkills = state && state.catalog && Array.isArray(state.catalog.skills) ? state.catalog.skills : [];
+      const personalSkills = state && Array.isArray(state.personalSkills) ? state.personalSkills : [];
+      return catalogSkills.map(applySkillOverride).concat(personalSkills.map(function (skill) { return Object.assign({}, skill); }));
+    }
+
+    function librarySkillById(id) {
+      if (!id) return null;
+      const base = baseCatalogSkillById(id);
+      if (base) return applySkillOverride(base);
+      const personal = state && Array.isArray(state.personalSkills) ? state.personalSkills.find(function (skill) { return skill.id === id || skill.catalogId === id; }) : null;
+      return personal ? Object.assign({}, personal) : null;
+    }
+
+    function resolveRoutineSkill(raw) {
+      if (!raw || typeof raw !== "object") return raw;
+      const live = raw.catalogId ? librarySkillById(raw.catalogId) : null;
+      const source = live || raw;
+      const resolved = Object.assign({}, source, {
+        id: String(raw.id || source.id || uniqueId("step")),
+        catalogId: String(raw.catalogId || source.catalogId || ""),
+        variant: String(raw.variant || "").slice(0, 80),
+        spotted: Boolean(raw.spotted),
+        ruleConditionConfirmed: Boolean(raw.ruleConditionConfirmed),
+        titleOverride: cleanTitle(raw.titleOverride),
+        countsAsSkill: raw.countsAsSkill !== false,
+        catalogVersion: String(raw.catalogVersion || source.catalogVersion || ""),
+        rulesetId: String(raw.rulesetId || source.rulesetId || ""),
+        displayTitle: live ? cleanTitle(live.displayTitle) : cleanTitle(raw.displayTitle),
+        libraryMissing: Boolean(raw.catalogId && !live)
+      });
+      resolved.plannedEg = resolved.eg;
+      resolved.isDismount = Boolean(resolved.eg === "IV" && isKnownSkillKind(resolved.kind) && resolved.applicableLevels && resolved.applicableLevels.length);
+      return resolved;
+    }
+
+    function displayNameForSkill(skill) {
+      return cleanTitle(skill && skill.titleOverride) || cleanTitle(skill && skill.displayTitle) || String(skill && skill.name || "");
+    }
+
+    function classificationProblem(skill, level) {
+      const problems = [];
+      if (!isKnownSkillKind(skill && skill.kind)) problems.push("value");
+      if (!skill || !skill.eg) problems.push("EG");
+      if (!level || !skill || !Array.isArray(skill.applicableLevels) || skill.applicableLevels.indexOf(level) === -1) problems.push(level ? level + " applicability" : "NGA level");
+      return problems;
+    }
+
+    function isClassificationReady(skill, level) {
+      return Boolean(skill) && skill.countsAsSkill !== false && !classificationProblem(skill, level).length;
+    }
+
+    function pinDismountsToFinish(skills, level) {
+      if (!state || !Array.isArray(skills) || skills.length < 2) return false;
+      const activeLevel = level || (currentAthlete() && currentAthlete().level) || "";
+      const isPinnedDismount = function (raw) {
+        const skill = resolveRoutineSkill(raw);
+        return Boolean(skill && skill.isDismount && isClassificationReady(skill, activeLevel));
+      };
+      const regularSkills = skills.filter(function (skill) { return !isPinnedDismount(skill); });
+      const dismounts = skills.filter(isPinnedDismount);
+      if (!dismounts.length) return false;
+      const ordered = regularSkills.concat(dismounts);
+      const changed = ordered.some(function (skill, index) { return skill !== skills[index]; });
+      if (changed) skills.splice.apply(skills, [0, skills.length].concat(ordered));
+      return changed;
+    }
+
+    function valueOptions(selected) {
+      const actual = normalizeKind(selected) || "Unknown";
+      const values = [
+        { value: "", label: "? — unknown" },
+        { value: "SS", label: "SS" },
+        { value: "A", label: "FIG A" },
+        { value: "B", label: "FIG B" },
+        { value: "C", label: "FIG C" },
+        { value: "D", label: "FIG D" },
+        { value: "E", label: "FIG E" },
+        { value: "F", label: "FIG F" },
+        { value: "G", label: "FIG G" }
+      ];
+      return values.map(function (item) {
+        const selectedText = (item.value ? actual === item.value : actual === "Unknown") ? " selected" : "";
+        return "<option value=\"" + item.value + "\"" + selectedText + ">" + item.label + "</option>";
+      }).join("");
+    }
+
+    function egOptions(selected) {
+      const actual = normalizeEG(selected);
+      return ["", "I", "II", "III", "IV"].map(function (value) {
+        const label = value ? "EG " + value : "? — unknown EG";
+        return "<option value=\"" + value + "\"" + (actual === value ? " selected" : "") + ">" + label + "</option>";
+      }).join("");
+    }
+
+    function apparatusOptions(selected) {
+      return ["floor", "mushroom", "rings", "parallelBars", "highBar"].map(function (eventId) {
+        return "<option value=\"" + eventId + "\"" + (selected === eventId ? " selected" : "") + ">" + escapeHtml(EVENTS[eventId].name) + "</option>";
+      }).join("");
+    }
+
+    function levelChoices(levels, attribute) {
+      const selected = normalizeApplicableLevels(levels);
+      return ["4N", "5N"].map(function (level) {
+        return "<label class=\"check-inline\"><input type=\"checkbox\" " + attribute + "=\"" + level + "\"" + (selected.indexOf(level) !== -1 ? " checked" : "") + "> " + level + "</label>";
+      }).join("");
+    }
+
+    function reviewLabel(skill) {
+      if (skill.personal) return "my library skill";
+      if (skill.reviewStatus) return String(skill.reviewStatus).replace(/_/g, " ");
+      return sourceStatusLabel(skill.sourceStatus);
+    }
+
+    function renderLibraryEditor(skill) {
+      const personal = Boolean(skill.personal);
+      const sourceDetails = personal ? "" : "<div class=\"library-source\"><strong>Immutable source details</strong><br>Full source name: " + escapeHtml(skill.name) + "<br>" + escapeHtml(skill.sourceNote || "Source citation retained in the catalog") + (skill.source && skill.source.evidence ? "<br>Citation: " + escapeHtml(skill.source.evidence) : "") + (skill.reviewStatus ? "<br>Review: " + escapeHtml(reviewLabel(skill)) : "") + (skill.eligibilityNote ? "<br>Eligibility note: " + escapeHtml(skill.eligibilityNote) : "") + (skill.eligibilityAuthority ? "<br>Eligibility authority: " + escapeHtml(skill.eligibilityAuthority) : "") + "</div>";
+      const identity = personal
+        ? "<label class=\"field\">Full name <input data-library-name maxlength=\"180\" value=\"" + escapeHtml(skill.name) + "\"></label><label class=\"field\">Apparatus <select data-library-apparatus>" + apparatusOptions(skill.apparatus) + "</select></label>"
+        : "";
+      const actionLabel = personal ? "Save my skill" : "Save local details";
+      const resetButton = personal ? "" : "<button type=\"button\" class=\"button small quiet\" data-action=\"reset-library-overrides\" data-library-id=\"" + escapeHtml(skill.id) + "\">Reset local details</button>";
+      const deleteButton = personal ? "<button type=\"button\" class=\"button small danger\" data-action=\"delete-personal-skill\" data-library-id=\"" + escapeHtml(skill.id) + "\">Delete from my library</button>" : "";
+      return "<div class=\"library-editor\" data-library-editor=\"" + escapeHtml(skill.id) + "\">" + sourceDetails + "<div class=\"library-editor-grid\">" + identity + "<label class=\"field\">Shared short title <input data-library-title maxlength=\"90\" value=\"" + escapeHtml(skill.displayTitle || "") + "\" placeholder=\"Optional shorter routine title\"></label><label class=\"field\">Value <select data-library-kind>" + valueOptions(skill.kind) + "</select></label><label class=\"field\">Element group <select data-library-eg>" + egOptions(skill.eg) + "</select></label><div class=\"library-levels\"><span>Applies to NGA level(s)</span>" + levelChoices(skill.applicableLevels, "data-library-level") + "</div></div><div class=\"library-editor-actions\"><button type=\"button\" class=\"button small\" data-action=\"save-library-skill\" data-library-id=\"" + escapeHtml(skill.id) + "\">" + actionLabel + "</button>" + resetButton + deleteButton + "<button type=\"button\" class=\"button small quiet\" data-action=\"close-library-editor\">Close</button></div><p class=\"tiny\">Unknown value, EG, or NGA applicability stays unknown and receives no automatic routine credit.</p></div>";
+    }
+
+    function renderSkillCard(skill) {
+      const kindClass = skill.kind === "SS" ? "ss" : skill.kind === "Unknown" ? "unknown" : "fig";
+      const code = skill.code ? skill.code : skill.kind;
+      const favorite = isStarred(skill);
+      const favoriteKey = skillFavoriteKey(skill);
+      const locked = favoriteEditUnlocked ? "" : " disabled aria-disabled=\"true\"";
+      const title = favoriteEditUnlocked ? (favorite ? "Remove from favorites" : "Add to favorites") : "Favorite editing is locked";
+      const displayName = displayNameForSkill(skill);
+      const fullName = displayName !== skill.name ? "<span class=\"skill-full-name\">Full: " + escapeHtml(skill.name) + "</span>" : "";
+      const levelText = skill.applicableLevels && skill.applicableLevels.length ? skill.applicableLevels.join(", ") : "levels ?";
+      const classification = currentAthlete().level && !isClassificationReady(skill, currentAthlete().level) ? "<span class=\"chip unknown\">needs classification</span>" : "";
+      const editor = libraryEditorId === skill.id ? renderLibraryEditor(skill) : "";
+      return "<div class=\"skill-card\" draggable=\"true\" data-drag-catalog-id=\"" + escapeHtml(skill.id) + "\"><button type=\"button\" class=\"skill-select\" data-catalog-id=\"" + escapeHtml(skill.id) + "\"><span class=\"skill-code\">" + escapeHtml(code) + "</span><span><span class=\"skill-name\">" + escapeHtml(displayName) + "</span>" + fullName + "<span class=\"skill-meta\"><span class=\"chip " + kindClass + "\">" + escapeHtml(skill.kind) + "</span><span class=\"chip\">EG " + escapeHtml(skill.eg || "?") + "</span><span class=\"chip\">" + escapeHtml(levelText) + "</span>" + classification + "</span><span class=\"source-label\">" + escapeHtml(reviewLabel(skill)) + "</span></span></button><div class=\"skill-card-actions\"><button type=\"button\" class=\"button small quiet\" data-action=\"edit-library-skill\" data-library-id=\"" + escapeHtml(skill.id) + "\">Edit</button><button type=\"button\" class=\"favorite-star" + (favorite ? " is-starred" : "") + "\" data-action=\"toggle-star\" data-star-key=\"" + escapeHtml(favoriteKey) + "\" aria-pressed=\"" + (favorite ? "true" : "false") + "\" aria-label=\"" + (favorite ? "Remove " : "Add ") + escapeHtml(displayName) + (favorite ? " from favorite skills" : " to favorite skills") + "\" title=\"" + title + "\"" + locked + ">" + (favorite ? "★" : "☆") + "</button></div>" + editor + "</div>";
+    }
+
+    function renderManualSkillForm(eventId) {
+      return "<details class=\"manual\"><summary>Add a skill to my library</summary><div class=\"manual-grid library-add-grid\"><input data-personal=\"name\" maxlength=\"180\" placeholder=\"Full skill name (required)\"><select data-personal=\"apparatus\">" + apparatusOptions(eventId) + "</select><input data-personal=\"title\" maxlength=\"90\" placeholder=\"Short title (optional)\"><select data-personal=\"kind\">" + valueOptions("Unknown") + "</select><select data-personal=\"eg\">" + egOptions("") + "</select></div><div class=\"personal-levels\"><span>Applies to:</span>" + levelChoices([], "data-personal-level") + "</div><div style=\"padding:0 10px 10px\"><button type=\"button\" class=\"button small\" data-action=\"add-personal-skill\">Save to my library</button><div class=\"tiny\" style=\"margin-top:7px\">Full name and apparatus are required. Value, EG, and levels are intentionally optional and start unknown; this does not add the skill to this routine.</div></div></details>";
+    }
+
+    function renderLibraryPanel(eventId, mushroomMode) {
+      const event = EVENTS[eventId];
+      const filter = libraryFilterFor(eventId);
+      const allSkills = librarySkills().filter(function (skill) { return skill.apparatus === eventId; });
+      const filtered = allSkills.filter(function (skill) {
+        const haystack = (displayNameForSkill(skill) + " " + skill.name + " " + skill.code + " " + skill.kind + " " + skill.eg).toLowerCase();
+        return (!filter.search || haystack.indexOf(filter.search.toLowerCase()) !== -1) &&
+          (filter.kind === "all" || skill.kind === filter.kind) &&
+          (filter.eg === "all" || skill.eg === filter.eg) &&
+          (filter.favorites !== "starred" || isStarred(skill));
+      });
+      const favoriteCount = allSkills.filter(function (skill) { return isStarred(skill); }).length;
+      let libraryContent = "";
+      if (!allSkills.length) {
+        libraryContent = "<div class=\"empty-routine\">No " + escapeHtml(event.name) + " library skills yet. Add one to your library below, or load a catalog.</div>";
+      } else if (!filtered.length) {
+        libraryContent = "<div class=\"empty-routine\">No skills match those filters.</div>";
+      } else {
+        libraryContent = filtered.map(function (skill) { return renderSkillCard(skill); }).join("");
+      }
+      const intro = mushroomMode ? "Curated no-pommels/mushroom candidate set — source-indexed for 4N/5N. Blank EGs are deliberately left for coach review." : "Click a skill to add it, or drag it into the routine.";
+      const favoriteEditor = favoriteEditUnlocked
+        ? "<span class=\"favorite-mode-status\">★ STAR EDIT MODE ON</span><button type=\"button\" class=\"button quiet small\" data-action=\"lock-stars\">Lock stars</button>"
+        : "<form class=\"favorite-lock\" data-favorite-form><label>★ edits locked <input type=\"password\" data-favorite-password inputmode=\"numeric\" autocomplete=\"off\" maxlength=\"16\" aria-label=\"Favorite password\" placeholder=\"password\"></label><button type=\"submit\" class=\"button quiet small\">Unlock stars</button></form>";
+      return "<section class=\"panel library-panel\"><div class=\"panel-head\"><div><h3>Skill library</h3><div class=\"tiny\">" + intro + "</div></div><span class=\"catalog-pill " + state.catalog.status + "\">" + allSkills.length + "</span></div><div class=\"panel-body\">" +
+        "<div class=\"library-controls\"><input class=\"library-search\" data-filter=\"search\" value=\"" + escapeHtml(filter.search) + "\" placeholder=\"Search title, full name, or code\"><select data-filter=\"kind\"><option value=\"all\">All</option><option value=\"Unknown\"" + selectedAttr(filter.kind, "Unknown") + ">? unknown</option><option value=\"SS\"" + selectedAttr(filter.kind, "SS") + ">SS</option><option value=\"A\"" + selectedAttr(filter.kind, "A") + ">A</option><option value=\"B\"" + selectedAttr(filter.kind, "B") + ">B</option><option value=\"C\"" + selectedAttr(filter.kind, "C") + ">C</option></select><select data-filter=\"eg\"><option value=\"all\">All EG</option><option value=\"I\"" + selectedAttr(filter.eg, "I") + ">EG I</option><option value=\"II\"" + selectedAttr(filter.eg, "II") + ">EG II</option><option value=\"III\"" + selectedAttr(filter.eg, "III") + ">EG III</option><option value=\"IV\"" + selectedAttr(filter.eg, "IV") + ">EG IV</option></select></div>" +
+        "<div class=\"library-list\" id=\"libraryList\">" + libraryContent + "</div>" +
+        "<div class=\"library-footer\"><span class=\"tiny\">" + filtered.length + " shown · ★ " + favoriteCount + " favorite" + (favoriteCount === 1 ? "" : "s") + "</span><div class=\"library-actions\">" + favoriteEditor + "<button type=\"button\" class=\"button quiet small star-sort" + (filter.favorites === "starred" ? " is-active" : "") + "\" data-action=\"toggle-star-sort\">" + (filter.favorites === "starred" ? "☆ show all" : "★ starred only") + "</button></div></div>" +
+        renderManualSkillForm(eventId) + "</div></section>";
+    }
+
+    function sourceStatusLabel(status) {
+      if (status === "verified") return "page-cited verified source";
+      if (status === "legacy") return "legacy candidate — needs revalidation";
+      if (status === "source_indexed") return "current-source candidate — coach review";
+      if (status === "personal") return "my library skill";
+      if (status === "needs_review") return "needs source review";
+      return status || "needs source review";
+    }
+
+    function routineSnapshotFromLibrarySkill(skill) {
+      return {
+        id: uniqueId("step"),
+        catalogId: skill.id,
+        repeatKey: skill.repeatKey || skill.id,
+        name: skill.name,
+        displayTitle: cleanTitle(skill.displayTitle),
+        titleOverride: "",
+        apparatus: skill.apparatus,
+        kind: skill.kind,
+        code: skill.code,
+        eg: skill.eg,
+        plannedEg: skill.eg,
+        sourceStatus: skill.sourceStatus,
+        sourceNote: skill.sourceNote,
+        source: skill.source ? Object.assign({}, skill.source) : null,
+        citations: normalizeCitationList(skill.citations),
+        reviewStatus: skill.reviewStatus || "",
+        eligibilityNote: skill.eligibilityNote || "",
+        eligibilityAuthority: skill.eligibilityAuthority || "",
+        isDismount: Boolean(skill.isDismount),
+        countsAsSkill: skill.countsAsSkill !== false,
+        applicableLevels: normalizeApplicableLevels(skill.applicableLevels),
+        restrictions: Array.isArray(skill.restrictions) ? skill.restrictions.slice() : [],
+        catalogVersion: state.catalog.catalogVersion || "",
+        rulesetId: state.catalog.rulesetId || "",
+        spotted: false,
+        custom: Boolean(skill.custom),
+        personal: Boolean(skill.personal)
+      };
+    }
+
+    function addCatalogSkill(catalogId, insertionIndex, preserveLibraryScroll) {
+      const skill = librarySkillById(catalogId);
+      if (!skill || currentEvent === "overview" || EVENTS[currentEvent].type === "vault" || skill.apparatus !== currentEvent) return;
+      const data = currentEventData();
+      const occurrence = routineSnapshotFromLibrarySkill(skill);
+      if (typeof insertionIndex === "number" && insertionIndex >= 0 && insertionIndex < data.skills.length) data.skills.splice(insertionIndex, 0, occurrence);
+      else data.skills.push(occurrence);
+      const dismountMoved = pinDismountsToFinish(data.skills, currentAthlete().level);
+      playSound("success");
+      saveState(dismountMoved ? "Kept classified dismounts at the routine finish" : undefined);
+      renderApp({ preserveLibraryScroll: Boolean(preserveLibraryScroll) });
+    }
+
+    function selectedCheckboxLevels(attribute) {
+      return Array.prototype.slice.call(workspace.querySelectorAll("[" + attribute + "]:checked")).map(function (input) { return input.getAttribute(attribute); });
+    }
+
+    function addPersonalSkill() {
+      const nameInput = workspace.querySelector("[data-personal=\"name\"]");
+      const apparatusInput = workspace.querySelector("[data-personal=\"apparatus\"]");
+      const titleInput = workspace.querySelector("[data-personal=\"title\"]");
+      const kindInput = workspace.querySelector("[data-personal=\"kind\"]");
+      const egInput = workspace.querySelector("[data-personal=\"eg\"]");
+      const name = nameInput ? nameInput.value.trim() : "";
+      const apparatus = apparatusInput ? normalizeApparatus(apparatusInput.value) : "";
+      if (!name || !apparatus) {
+        playSound("error");
+        if (!name && nameInput) nameInput.focus();
+        else if (apparatusInput) apparatusInput.focus();
+        return;
+      }
+      const duplicate = (state.personalSkills || []).find(function (skill) {
+        return skill.apparatus === apparatus && normalizeText(skill.name) === normalizeText(name);
+      });
+      if (duplicate) {
+        playSound("warning");
+        libraryEditorId = duplicate.id;
+        window.alert("That full name is already in your " + EVENTS[apparatus].name + " library.");
+        renderApp({ preserveLibraryScroll: true });
+        return;
+      }
+      const skill = normalizePersonalSkill({
+        id: uniqueId("personal"),
+        name: name,
+        displayTitle: titleInput ? titleInput.value : "",
+        apparatus: apparatus,
+        kind: kindInput ? kindInput.value : "",
+        eg: egInput ? egInput.value : "",
+        applicableLevels: selectedCheckboxLevels("data-personal-level"),
+        sourceNote: "Personal library skill"
+      }, state.personalSkills.length);
+      if (!skill) return;
+      state.personalSkills.push(skill);
+      libraryEditorId = skill.id;
+      playSound("success");
+      saveState("Saved " + displayNameForSkill(skill) + " to my library");
+      renderApp({ preserveLibraryScroll: true });
+    }
+
+    function addManualSkill() {
+      addPersonalSkill();
+    }
+
+    function promoteRoutineSkill(index) {
+      const raw = currentEventData().skills[index];
+      if (!raw || raw.catalogId) return;
+      const skill = normalizePersonalSkill({
+        id: uniqueId("personal"),
+        name: raw.name,
+        displayTitle: raw.displayTitle || "",
+        apparatus: raw.apparatus || currentEvent,
+        kind: raw.kind,
+        eg: raw.eg,
+        applicableLevels: raw.applicableLevels,
+        sourceNote: "Promoted from a temporary routine skill"
+      }, state.personalSkills.length);
+      if (!skill) return;
+      state.personalSkills.push(skill);
+      raw.catalogId = skill.id;
+      raw.repeatKey = skill.repeatKey;
+      raw.displayTitle = skill.displayTitle;
+      raw.personal = true;
+      raw.custom = true;
+      raw.sourceStatus = "personal";
+      raw.sourceNote = skill.sourceNote;
+      raw.applicableLevels = skill.applicableLevels.slice();
+      libraryEditorId = skill.id;
+      playSound("success");
+      saveState("Promoted this routine skill to my library");
+      renderApp({ preserveLibraryScroll: true });
+    }
+
+    function saveLibrarySkill(id) {
+      const skill = librarySkillById(id);
+      if (!skill) return;
+      const titleInput = workspace.querySelector("[data-library-title]");
+      const kindInput = workspace.querySelector("[data-library-kind]");
+      const egInput = workspace.querySelector("[data-library-eg]");
+      const levels = selectedCheckboxLevels("data-library-level");
+      const displayTitle = titleInput ? titleInput.value : "";
+      const kind = kindInput ? kindInput.value : "";
+      const eg = egInput ? egInput.value : "";
+      if (skill.personal) {
+        const nameInput = workspace.querySelector("[data-library-name]");
+        const apparatusInput = workspace.querySelector("[data-library-apparatus]");
+        const replacement = normalizePersonalSkill(Object.assign({}, skill, {
+          name: nameInput ? nameInput.value : skill.name,
+          apparatus: apparatusInput ? apparatusInput.value : skill.apparatus,
+          displayTitle: displayTitle,
+          kind: kind,
+          eg: eg,
+          applicableLevels: levels
+        }), 0);
+        if (!replacement) {
+          playSound("error");
+          if (nameInput) nameInput.focus();
+          return;
+        }
+        const position = state.personalSkills.findIndex(function (item) { return item.id === id; });
+        if (position !== -1) state.personalSkills.splice(position, 1, replacement);
+      } else {
+        const override = normalizeSkillOverride({ displayTitle: displayTitle, kind: kind, eg: eg, applicableLevels: levels });
+        if (override) state.skillOverrides[id] = override;
+      }
+      playSound("success");
+      saveState("Saved library details locally");
+      renderApp({ preserveLibraryScroll: true });
+    }
+
+    function resetLibraryOverrides(id) {
+      if (!state.skillOverrides || !hasOwn(state.skillOverrides, id)) return;
+      delete state.skillOverrides[id];
+      playSound("warning");
+      saveState("Restored the cited catalog details");
+      renderApp({ preserveLibraryScroll: true });
+    }
+
+    function deletePersonalSkill(id) {
+      const skill = state.personalSkills.find(function (item) { return item.id === id; });
+      if (!skill) return;
+      if (!window.confirm("Remove “" + displayNameForSkill(skill) + "” from your personal library? Existing routine steps will stay in place.")) return;
+      state.personalSkills = state.personalSkills.filter(function (item) { return item.id !== id; });
+      if (state.skillOverrides) delete state.skillOverrides[id];
+      libraryEditorId = "";
+      playSound("remove");
+      saveState("Removed the personal library entry; routine steps were preserved");
+      renderApp({ preserveLibraryScroll: true });
+    }
+
+    function sortByEG() {
+      const skills = currentEventData().skills;
+      const rank = function (raw) {
+        const eg = resolveRoutineSkill(raw).eg;
+        const index = ["I", "II", "III", "IV"].indexOf(eg);
+        return index === -1 ? 99 : index;
+      };
+      skills.sort(function (left, right) { return rank(left) - rank(right); });
+      pinDismountsToFinish(skills, currentAthlete().level);
+      saveState("Sorted this draft by classified EG");
+      renderApp();
+    }
+
+    function evaluateSkillRoutine(eventId) {
+      const athlete = currentAthlete();
+      const rules = catalogRulesFor(athlete.level);
+      const data = athlete.events[eventId] || emptyEvent();
+      const skills = (data.skills || []).map(resolveRoutineSkill);
+      const special = normalizeEventSpecial(data.special);
+      const unresolvedSkills = skills.filter(function (skill) { return skill.countsAsSkill !== false && !isClassificationReady(skill, athlete.level); });
+      if (!rules) {
+        return { skills: skills, performedSkills: [], uniqueSkills: [], unresolvedSkills: unresolvedSkills, mathPass: false, catalogReady: false, shortStatus: "choose a level", creditPlan: null, unverified: skills, spotted: [], outOfRange: [], unsupported: [], missingGroups: ["I", "II", "III", "IV"], conditionPending: [], extraFullSwings: special.extraFullSwings, highBarStartMovements: special.highBarStartMovements, floorDurationSeconds: special.floorDurationSeconds, deductionFlags: 0 };
+      }
+      const performedSkills = skills.filter(function (skill) { return isClassificationReady(skill, athlete.level); });
+      const eligible = creditEligibleSkills(performedSkills);
+      const outOfRange = performedSkills.filter(function (skill) { return isRangeConverted(eventId, skill, rules); });
+      const unsupported = performedSkills.filter(function (skill) {
+        const kind = adjustedKindBeforeRange(eventId, skill);
+        return kind !== "SS" && !isFIGKind(kind);
+      });
+      const ssCount = performedSkills.filter(function (skill) { return creditedKind(eventId, skill, rules) === "SS"; }).length;
+      const groupSet = new Set(eligible.map(function (skill) { return creditedEG(eventId, skill); }).filter(Boolean));
+      const missingGroups = ["I", "II", "III", "IV"].filter(function (eg) { return !groupSet.has(eg); });
+      const creditPlan = findCreditPlan(eventId, eligible, rules);
+      const spotted = performedSkills.filter(function (skill) { return skill.spotted; });
+      const conditionPending = eligible.filter(function (skill) {
+        const condition = skillRuleCondition(eventId, skill);
+        return condition && condition.requiredForEg && !skill.ruleConditionConfirmed;
+      });
+      const unverified = performedSkills.filter(function (skill) { return skill.sourceStatus !== "verified"; });
+      const countOk = performedSkills.length >= rules.minUniqueSkills && performedSkills.length <= rules.maxUniqueSkills;
+      const ssOk = ssCount <= rules.maxSS;
+      const figOk = !unsupported.length;
+      const allGroups = !missingGroups.length;
+      const extraSwingOk = !EXTRA_SWING_EVENTS.has(eventId) || special.extraFullSwings <= MAX_EXTRA_FULL_SWINGS;
+      const startMovementsOk = eventId !== "highBar" || special.highBarStartMovements <= MAX_HIGH_BAR_START_MOVEMENTS;
+      const durationRecorded = eventId !== "floor" || special.floorDurationSeconds > 0;
+      const durationOk = eventId !== "floor" || (durationRecorded && special.floorDurationSeconds <= MAX_FLOOR_DURATION_SECONDS);
+      const catalogReady = state.catalog.status === "verified" && !unverified.length && !unresolvedSkills.length;
+      const mathPass = !unresolvedSkills.length && countOk && ssOk && figOk && allGroups && Boolean(creditPlan) && extraSwingOk && startMovementsOk && durationOk && !conditionPending.length;
+      const deductionFlags = outOfRange.length + spotted.length;
+      let shortStatus = "needs requirements";
+      if (mathPass) {
+        if (deductionFlags) shortStatus = "requirements met; deduction review";
+        else shortStatus = catalogReady ? "draft math complete" : "math complete; catalog review";
+      } else if (unresolvedSkills.length) {
+        shortStatus = "classification needed";
+      } else if (performedSkills.length < rules.minUniqueSkills) {
+        shortStatus = "needs more performed skills";
+      } else if (!extraSwingOk || !startMovementsOk || !durationOk) {
+        shortStatus = "event-rule review";
+      } else if (conditionPending.length) {
+        shortStatus = "finish/position confirmation needed";
+      }
+      return {
+        skills: skills,
+        performedSkills: performedSkills,
+        uniqueSkills: eligible,
+        unresolvedSkills: unresolvedSkills,
+        countOk: countOk,
+        ssOk: ssOk,
+        figOk: figOk,
+        allGroups: allGroups,
+        mathPass: mathPass,
+        catalogReady: catalogReady,
+        ssCount: ssCount,
+        outOfRange: outOfRange,
+        unsupported: unsupported,
+        missingGroups: missingGroups,
+        creditPlan: creditPlan,
+        unverified: unverified,
+        spotted: spotted,
+        conditionPending: conditionPending,
+        extraFullSwings: special.extraFullSwings,
+        extraSwingOk: extraSwingOk,
+        highBarStartMovements: special.highBarStartMovements,
+        startMovementsOk: startMovementsOk,
+        floorDurationSeconds: special.floorDurationSeconds,
+        durationRecorded: durationRecorded,
+        durationOk: durationOk,
+        deductionFlags: deductionFlags,
+        shortStatus: shortStatus
+      };
+    }
+
+    function renderRoutinePanel(eventId, result, mushroomMode) {
+      const data = currentEventData();
+      const routineSkills = result && Array.isArray(result.skills) ? result.skills : (data.skills || []).map(resolveRoutineSkill);
+      const repeatInfo = getRepeatInfo(routineSkills);
+      const creditIds = result && result.creditPlan ? result.creditPlan.map(function (item) { return item.id; }) : [];
+      const list = routineSkills.length ? routineSkills.map(function (skill, index) {
+        return renderRoutineItem(eventId, skill, index, repeatInfo[index], creditIds.indexOf(skill.id) !== -1, mushroomMode);
+      }).join("") : "<div class=\"empty-routine\">Drag skills here in the athlete’s intended performance order.<br><br>On iPad, tap a library skill to add it.</div>";
+      const title = mushroomMode ? "Mushroom sequence draft" : "Routine sequence";
+      const ruleControls = mushroomMode ? "" : renderEventRuleControls(eventId);
+      return "<section class=\"panel\"><div class=\"panel-head\"><div><h3>" + title + "</h3><div class=\"tiny\">Drag to reorder. Only classified, applicable EG IV skills are pinned at the finish.</div></div><button class=\"button small\" type=\"button\" data-action=\"sort-eg\">Sort sequence by EG</button></div><div class=\"panel-body\"><div class=\"routine-list\" id=\"routineList\">" + list + "</div>" + ruleControls + "<label class=\"field\" style=\"margin-top:12px\">Coach notes<textarea class=\"notes\" data-notes placeholder=\"Holds, connections, equipment, coaching cues, judge questions…\">" + escapeHtml(data.notes) + "</textarea></label></div></section>";
+    }
+
+    function renderRoutineItem(eventId, skill, index, repeat, isCredit, mushroomMode) {
+      const rules = catalogRulesFor(currentAthlete().level);
+      const classified = isClassificationReady(skill, currentAthlete().level);
+      const effective = rules && classified ? creditedKind(eventId, skill, rules) : (skill.kind || "Unknown");
+      const condition = skillRuleCondition(eventId, skill);
+      const kindClass = effective === "SS" ? "ss" : effective === "Unknown" ? "unknown" : "fig";
+      const classes = "routine-item" + (isCredit ? " credit" : "") + (repeat ? " repeat" : "");
+      const status = skill.libraryMissing ? "Personal library entry removed — routine snapshot kept" : (skill.personal ? "My library skill" : sourceStatusLabel(skill.sourceStatus));
+      const repeatNote = repeat && classified ? "<span class=\"chip ss\">repeat: no EG/VP credit</span>" : "";
+      const spotted = skill.spotted && classified ? "<span class=\"chip unknown\">spot used: SS + EG credit; −0.50 review</span>" : "";
+      const rangeConverted = rules && classified && isRangeConverted(eventId, skill, rules) ? "<span class=\"chip unknown\">range → A; −0.50 review</span>" : "";
+      const adjusted = classified && effective !== skill.kind && !skill.spotted && !isRangeConverted(eventId, skill, rules) ? "<span class=\"chip\">NGA value adjustment</span>" : "";
+      const credit = isCredit ? "<span class=\"chip\" style=\"border-color:rgba(121,221,162,.65);color:#d7ffe5\">possible EG credit</span>" : "";
+      const eg = classified ? creditedEG(eventId, skill) : "";
+      const egNote = !classified ? "<span class=\"chip unknown\">needs classification: " + escapeHtml(classificationProblem(skill, currentAthlete().level).join(", ")) + "</span>" : (!eg && condition ? "<span class=\"chip unknown\">no EG until confirmed</span>" : "");
+      const finishOnly = skill.isDismount && classified ? "<span class=\"chip ss\">finish only</span>" : "";
+      const conditionControl = condition ? "<label class=\"check-inline\"><input type=\"checkbox\" data-step-rule-condition=\"" + index + "\"" + (skill.ruleConditionConfirmed ? " checked" : "") + "> " + escapeHtml(condition.label) + "</label>" : "";
+      const variantControl = eventId === "floor" ? "<label class=\"check-inline\">Distinct VP variant <input type=\"text\" maxlength=\"80\" data-step-variant=\"" + index + "\" value=\"" + escapeHtml(skill.variant || "") + "\" placeholder=\"e.g., pike or ½ twist\"></label>" : "";
+      const titleControl = "<label class=\"check-inline routine-title-control\">Routine nickname <input type=\"text\" maxlength=\"90\" data-step-title=\"" + index + "\" value=\"" + escapeHtml(skill.titleOverride || "") + "\" placeholder=\"Optional routine-only name\"></label>";
+      const promoteControl = !skill.catalogId ? "<button type=\"button\" class=\"button small quiet\" data-action=\"promote-routine-skill\" data-index=\"" + index + "\">Save to my library</button>" : "";
+      const displayName = displayNameForSkill(skill);
+      const fullName = displayName !== skill.name ? "<div class=\"routine-full-name\">Full: " + escapeHtml(skill.name) + "</div>" : "";
+      return "<article class=\"" + classes + "\" draggable=\"true\" data-routine-index=\"" + index + "\"><span class=\"step-number\">" + (index + 1) + "</span><div><div class=\"routine-name\">" + escapeHtml(displayName) + "</div>" + fullName + "<div class=\"routine-flags\"><span class=\"chip " + kindClass + "\">" + escapeHtml(effective) + "</span><span class=\"chip\">" + escapeHtml(skill.code || "no code") + "</span><span class=\"chip\">EG " + escapeHtml(eg || skill.eg || "?") + "</span>" + finishOnly + credit + repeatNote + spotted + rangeConverted + adjusted + egNote + "</div><div class=\"source-label\">" + escapeHtml(status) + "</div></div><div class=\"routine-controls\">" + (mushroomMode ? "" : "<label class=\"check-inline\"><input type=\"checkbox\" data-step-spotted=\"" + index + "\"" + (skill.spotted ? " checked" : "") + "> spot used</label>") + titleControl + conditionControl + variantControl + "<div class=\"step-actions\">" + promoteControl + "<button type=\"button\" class=\"button small quiet\" data-action=\"move-up\" data-index=\"" + index + "\" aria-label=\"Move skill up\">↑</button><button type=\"button\" class=\"button small quiet\" data-action=\"move-down\" data-index=\"" + index + "\" aria-label=\"Move skill down\">↓</button><button type=\"button\" class=\"button small danger\" data-action=\"remove-skill\" data-index=\"" + index + "\" aria-label=\"Remove skill\">×</button></div></div></article>";
+    }
+
+    function renderRequirementPanel(eventId, result, mushroomMode) {
+      if (mushroomMode) return renderMushroomRequirements(result);
+      const athlete = currentAthlete();
+      const rules = catalogRulesFor(athlete.level);
+      if (!rules) {
+        return "<section class=\"panel\"><div class=\"panel-head\"><h3>Requirement check</h3></div><div class=\"panel-body\"><div class=\"decision warn\"><div class=\"decision-title\">Choose this athlete’s level first</div><div class=\"decision-copy\">The builder will then show the correct 4N or 5N mix, performed-skill range, FIG range, and SS cap.</div></div></div></section>";
+      }
+      const hasDeductions = result.deductionFlags > 0;
+      const decisionClass = result.mathPass ? (result.catalogReady && !hasDeductions ? "good" : "warn") : "bad";
+      const title = result.mathPass ? (hasDeductions ? "Requirement credit met — deduction review required" : (result.catalogReady ? "Draft math complete — still needs coach sign-off" : "Draft math looks complete — catalog review pending")) : "Draft requirement gaps";
+      const copy = result.mathPass
+        ? (hasDeductions ? "Spotted or out-of-range FIG skills retain the handbook’s required credit after conversion, but each carries a −0.50 review flag. A routine with −0.50 or more deductions has a 9.95 maximum score." : (result.catalogReady ? "Performance facts, sequence conditions, and current source updates still need a coach/judge review." : "The chosen labels satisfy the high-level math, but candidate or unverified rows prevent certification."))
+        : "Unknown classifications receive no automatic credit. Use the highlighted checks to adjust this draft; the app does not infer performance conditions.";
+      const rows = [
+        { ok: result.countOk, label: rules.minUniqueSkills + "–" + rules.maxUniqueSkills + " FIG/SS skills performed", detail: result.performedSkills.length + " performed / " + result.uniqueSkills.length + " distinct VP identities" },
+        { ok: result.ssOk, label: "Super Skill cap", detail: result.ssCount + " SS credited; maximum " + rules.maxSS },
+        { ok: result.figOk, label: "Recognized FIG values", detail: result.unsupported.length ? result.unsupported.map(function (item) { return displayNameForSkill(item) + " (" + adjustedKindBeforeRange(eventId, item) + ")"; }).join(", ") + " cannot be credited yet" : "A–" + rules.allowedFIG[rules.allowedFIG.length - 1] + " allowed" },
+        { ok: result.allGroups, label: "All four EGs represented", detail: result.missingGroups.length ? "Missing: " + result.missingGroups.join(", ") : "EG I, II, III, and IV found" },
+        { ok: Boolean(result.creditPlan), label: rules.figA + " FIG A + " + rules.ss + " SS requirement-slot allocation", detail: result.creditPlan ? "One possible four-EG draft allocation is highlighted in green." : "No valid distinct-EG A/SS allocation found yet." }
+      ];
+      const unresolved = result.unresolvedSkills || [];
+      rows.unshift({ ok: !unresolved.length, label: "Classify selected skills", detail: unresolved.length ? unresolved.map(function (skill) { return displayNameForSkill(skill) + " (" + classificationProblem(skill, athlete.level).join(", ") + ")"; }).join("; ") : "Every selected skill has a value, EG, and explicit 4N/5N applicability" });
+      if (EXTRA_SWING_EVENTS.has(eventId)) rows.splice(2, 0, { ok: result.extraSwingOk, label: "Extra full swing limit", detail: result.extraFullSwings + " planned; maximum " + MAX_EXTRA_FULL_SWINGS });
+      if (eventId === "highBar") rows.splice(3, 0, { ok: result.startMovementsOk, label: "High-bar start movements", detail: result.highBarStartMovements + " planned; maximum " + MAX_HIGH_BAR_START_MOVEMENTS });
+      if (eventId === "floor") rows.splice(2, 0, { ok: result.durationOk, label: "Floor routine time", detail: result.durationRecorded ? result.floorDurationSeconds + " seconds planned; maximum " + MAX_FLOOR_DURATION_SECONDS : "Record a planned duration to complete this check" });
+      if (result.outOfRange.length) rows.push({ ok: true, label: "Out-of-range FIG conversion", detail: result.outOfRange.length + " skill(s) receive A credit and a −0.50 review flag under the handbook." });
+      if (result.spotted.length) rows.push({ ok: true, label: "Spot-used conversion", detail: result.spotted.length + " skill(s) receive SS + EG credit and a −0.50 review flag." });
+      if (result.conditionPending.length) rows.push({ ok: false, label: "Conditional credit confirmation", detail: result.conditionPending.length + " selected step(s) need their stated finish/position confirmed before EG credit." });
+      rows.push({ ok: result.catalogReady, label: "Catalog rows verified", detail: result.catalogReady ? "Every selected row is marked verified by the loaded catalog." : result.unverified.length + " classified selected row(s) remain candidate, custom, or unreviewed." });
+      const credit = result.creditPlan ? "<div class=\"credit-list\"><strong>Possible credited EG draft — sequence order stays unchanged:</strong>" + result.creditPlan.map(function (item) { return "<span>EG " + escapeHtml(creditedEG(eventId, item)) + " · " + escapeHtml(displayNameForSkill(item)) + " (" + escapeHtml(creditedKind(eventId, item, rules)) + ")</span>"; }).join("") + "</div>" : "";
+      return "<section class=\"panel\"><div class=\"panel-head\"><h3>Requirement check</h3><span class=\"catalog-pill " + state.catalog.status + "\">" + escapeHtml(currentAthlete().level) + "</span></div><div class=\"panel-body\"><div class=\"requirement-summary\"><div class=\"decision " + decisionClass + "\"><div class=\"decision-title\">" + escapeHtml(title) + "</div><div class=\"decision-copy\">" + escapeHtml(copy) + "</div>" + credit + "</div><div class=\"checks\">" + rows.map(renderCheckRow).join("") + "</div><p class=\"tiny\">All classified FIG/SS skills performed count in the 6–8 range, including repeats. A repeat has no VP/EG credit. Unknown entries remain visible in the routine but do not count.</p></div></div></section>";
+    }
+
+    function evaluateMushroom() {
+      const athlete = currentAthlete();
+      const rules = catalogRulesFor(athlete.level);
+      const data = athlete.events.mushroom || emptyEvent();
+      const checks = mushroomChecksFor(athlete.level);
+      const skills = (data.skills || []).map(resolveRoutineSkill);
+      const unresolvedSkills = skills.filter(function (skill) { return skill.countsAsSkill !== false && !isClassificationReady(skill, athlete.level); });
+      const performedSkills = skills.filter(function (skill) { return isClassificationReady(skill, athlete.level); });
+      if (!rules || !checks.length) return { complete: false, shortStatus: "choose a level", skills: skills, performedSkills: performedSkills, unresolvedSkills: unresolvedSkills, countOk: false, missing: [] };
+      const checklist = data.special.checklist || {};
+      const missing = checks.filter(function (check) { return !checklist[check.id]; });
+      const countOk = performedSkills.length >= rules.minUniqueSkills && performedSkills.length <= rules.maxUniqueSkills;
+      const complete = !missing.length && countOk && !unresolvedSkills.length;
+      return { complete: complete, skills: skills, missing: missing, performedSkills: performedSkills, unresolvedSkills: unresolvedSkills, countOk: countOk, shortStatus: unresolvedSkills.length ? "classification needed" : (!countOk ? "needs " + rules.minUniqueSkills + "–" + rules.maxUniqueSkills + " classified performed skills" : (missing.length ? missing.length + " checklist item(s) left" : "checklist complete")) };
+    }
+
+    function renderMushroom() {
+      const athlete = currentAthlete();
+      const rules = catalogRulesFor(athlete.level);
+      const result = evaluateMushroom();
+      const checks = rules ? mushroomChecksFor(athlete.level) : [];
+      const checkList = rules ? checks.map(function (check) {
+        const checked = Boolean(currentEventData().special.checklist[check.id]);
+        return "<label class=\"option-card\"><input type=\"checkbox\" data-special-check=\"" + check.id + "\"" + (checked ? " checked" : "") + "><span>" + escapeHtml(check.label) + "</span></label>";
+      }).join("") : "<div class=\"decision warn\"><div class=\"decision-title\">Choose a level first</div><div class=\"decision-copy\">Mushroom requirements need a level-specific coach checklist.</div></div>";
+      const facts = rules ? [rules.minUniqueSkills + "–" + rules.maxUniqueSkills + " classified performed skills", rules.figA + " FIG A / " + rules.ss + " SS", "No stick bonus"] : ["Choose 4N or 5N"];
+      return "<div class=\"workspace-title\"><div><h2>Mushroom</h2><div class=\"event-facts\">" + facts.map(function (fact) { return "<span class=\"chip\">" + escapeHtml(fact) + "</span>"; }).join("") + "</div></div><button class=\"button danger small\" type=\"button\" data-action=\"clear-event\">Clear MR</button></div>" +
+        "<section class=\"event-special\"><h3>Current mushroom build card</h3><p class=\"tiny\">The library uses the curated 4N/5N no-pommels/mushroom candidate set from the current source index. It is still a coach-review set: blank EGs and display details stay unresolved until you classify them. The 6–8 performed-skill count below uses only classified skills.</p><div class=\"special-options\">" + checkList + "</div><p class=\"tiny\">EG I = flair, EG II = circles, EG III = 180° turn, EG IV = dismount. Dismount is rear support or a FIG A-or-higher value part. Landing is not evaluated and there is no stick bonus.</p></section>" +
+        renderPlanningGrid("mushroom", result, true);
+    }
+
+    function renderMushroomRequirements(result) {
+      const athlete = currentAthlete();
+      const level = athlete.level;
+      if (!level) return "<section class=\"panel\"><div class=\"panel-head\"><h3>Mushroom review</h3></div><div class=\"panel-body\"><div class=\"decision warn\"><div class=\"decision-title\">Choose 4N or 5N</div><div class=\"decision-copy\">Mushroom requirements need a level-specific coach checklist.</div></div></div></section>";
+      const rules = catalogRulesFor(level);
+      const unresolved = result.unresolvedSkills || [];
+      const rows = [
+        { ok: !unresolved.length, label: "Classify selected skills", detail: unresolved.length ? unresolved.map(function (skill) { return displayNameForSkill(skill) + " (" + classificationProblem(skill, level).join(", ") + ")"; }).join("; ") : "Every selected skill has a value, EG, and explicit 4N/5N applicability" },
+        { ok: result.countOk, label: rules.minUniqueSkills + "–" + rules.maxUniqueSkills + " FIG/SS skills performed", detail: result.performedSkills.length + " classified performed" }
+      ].concat(mushroomChecksFor(level).map(function (check) {
+        return { ok: Boolean(currentEventData().special.checklist[check.id]), label: check.label, detail: Boolean(currentEventData().special.checklist[check.id]) ? "Coach marked this planned" : "Still needs a coach confirmation" };
+      }));
+      return "<section class=\"panel\"><div class=\"panel-head\"><h3>Mushroom review</h3><span class=\"catalog-pill candidate\">Coach check</span></div><div class=\"panel-body\"><div class=\"decision " + (result.complete ? "warn" : "bad") + "\"><div class=\"decision-title\">" + (result.complete ? "Plan checklist complete — performance review required" : "Mushroom requirements still open") + "</div><div class=\"decision-copy\">This special-event card never becomes an automatic legal ruling. Verify rear-support finishes, value parts, custom EGs, and preceding circles/flairs in the real sequence.</div></div><div class=\"checks\" style=\"margin-top:12px\">" + rows.map(renderCheckRow).join("") + "</div></div></section>";
+    }
+
+    function renderCatalogStatus() {
+      const catalog = state.catalog;
+      const text = document.getElementById("catalogStatusText");
+      const copy = document.getElementById("catalogStatusCopy");
+      const pill = document.getElementById("catalogPill");
+      const personalCount = Array.isArray(state.personalSkills) ? state.personalSkills.length : 0;
+      text.textContent = catalogLabel().toLowerCase();
+      pill.className = "catalog-pill " + catalog.status;
+      pill.textContent = catalog.status === "none" ? (personalCount ? personalCount + " mine" : "No catalog") : catalog.skills.length + " catalog" + (personalCount ? " + " + personalCount + " mine" : "");
+      if (catalog.status === "legacy") {
+        copy.textContent = "Loaded from " + (catalog.sourceLabel || "the legacy skill list") + ". It is draft-only; your personal library is stored separately and will remain when you change catalogs.";
+      } else if (catalog.status === "candidate") {
+        const version = [catalog.catalogId, catalog.catalogVersion].filter(Boolean).join(" v");
+        copy.textContent = (version ? version + " is loaded. " : "A candidate data file is loaded. ") + "Mushroom uses the curated no-pommels 4N/5N candidate set. Citations and unresolved EGs remain review items; personal skills and local overrides stay on this device.";
+      } else if (catalog.status === "verified") {
+        copy.textContent = "A reviewed-format catalog file is loaded. The app still requires coach review of performance conditions and current updates.";
+      } else {
+        copy.textContent = personalCount ? "Your personal library is available, but no cited catalog is loaded." : "The bundled current catalog did not load. Use Import catalog file to select the current JSON catalog, then reopen the builder.";
+      }
+    }
+
+    function buildSummary() {
+      const student = STUDENTS.find(function (item) { return item.id === selectedAthleteId(); }) || STUDENTS[0];
+      const athlete = currentAthlete();
+      const snapshot = athlete.catalogSnapshot || catalogSnapshot();
+      const lines = [
+        "# NGA routine draft",
+        "",
+        "Athlete: " + student.name,
+        "Level: " + (athlete.level || "Not selected"),
+        "Routine status: " + (athlete.status || "draft"),
+        "Exported: " + new Date().toLocaleString(),
+        "Catalog status: " + catalogLabel(),
+        "Catalog ID: " + (snapshot.catalogId || "not recorded"),
+        "Catalog version: " + (snapshot.catalogVersion || "not recorded"),
+        "Ruleset: " + (snapshot.rulesetId || "not recorded"),
+        "",
+        "> Draft planner only. It is not a legal-routine ruling; review performance conditions and source currency.",
+        ""
+      ];
+      EVENT_ORDER.slice(1).forEach(function (eventId) {
+        const event = EVENTS[eventId];
+        const data = athlete.events[eventId];
+        lines.push("## " + event.name);
+        if (event.type === "vault") {
+          const options = vaultPlanFor(athlete.level).choices || [];
+          const selected = (data.special.vaults || []).map(function (id) {
+            const found = options.find(function (option) { return option.id === id; });
+            return found ? found.label : id;
+          });
+          lines.push(selected.length ? selected.map(function (item) { return "- " + item; }).join("\n") : "- Not planned");
+        } else {
+          lines.push(data.skills.length ? data.skills.map(function (raw, index) {
+            const skill = resolveRoutineSkill(raw);
+            const flags = [];
+            flags.push(isClassificationReady(skill, athlete.level) ? effectiveKind(skill) : "unclassified");
+            flags.push("EG " + (skill.eg || "?"));
+            if (skill.spotted) flags.push("spot used");
+            if (skill.libraryMissing) flags.push("personal library entry removed; routine snapshot retained");
+            if (skill.sourceStatus !== "verified") flags.push(sourceStatusLabel(skill.sourceStatus));
+            const title = displayNameForSkill(skill);
+            const fullName = skill.name || title;
+            return (index + 1) + ". " + title + (title !== fullName ? " — Full source name: " + fullName : "") + " — " + flags.join("; ");
+          }).join("\n") : "- Not planned");
+        }
+        if (data.notes) lines.push("", "Notes: " + data.notes);
+        lines.push("");
+      });
+      return lines.join("\n");
+    }
+
+    workspace.addEventListener("click", function (event) {
+      const action = event.target.closest("[data-action]");
+      if (!action) return;
+      const kind = action.dataset.action;
+      if (kind === "edit-library-skill") {
+        libraryEditorId = action.dataset.libraryId || "";
+        renderApp({ preserveLibraryScroll: true });
+        return;
+      }
+      if (kind === "close-library-editor") {
+        libraryEditorId = "";
+        renderApp({ preserveLibraryScroll: true });
+        return;
+      }
+      if (kind === "add-personal-skill") {
+        addPersonalSkill();
+        return;
+      }
+      if (kind === "save-library-skill") {
+        saveLibrarySkill(action.dataset.libraryId || "");
+        return;
+      }
+      if (kind === "reset-library-overrides") {
+        resetLibraryOverrides(action.dataset.libraryId || "");
+        return;
+      }
+      if (kind === "delete-personal-skill") {
+        deletePersonalSkill(action.dataset.libraryId || "");
+        return;
+      }
+      if (kind === "promote-routine-skill") {
+        promoteRoutineSkill(Number(action.dataset.index));
+      }
+    });
+
+    workspace.addEventListener("change", function (event) {
+      const target = event.target;
+      if (!target || target.dataset.stepTitle === undefined) return;
+      const skill = currentEventData().skills[Number(target.dataset.stepTitle)];
+      if (!skill) return;
+      skill.titleOverride = cleanTitle(target.value);
+      saveState();
     });
 
     const seededFavoriteCount = seedRequestedFavorites();
