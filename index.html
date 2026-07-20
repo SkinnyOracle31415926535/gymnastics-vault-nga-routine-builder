@@ -2350,15 +2350,19 @@
     }
     /* Read-only routine book: deliberately literal turn-of-the-millennium web UI. */
     body.print-view-active {
-      background-color: #000080;
-      background-image: radial-gradient(#fff 1px, transparent 1.5px);
-      background-size: 19px 19px;
+      background-color: #171c52;
+      background-image:
+        radial-gradient(circle at 18% 12%, rgba(145, 224, 228, .26), transparent 15rem),
+        radial-gradient(circle at 84% 4%, rgba(176, 149, 225, .28), transparent 18rem),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 7px);
     }
 
     body.print-view-active .workspace {
-      border: 4px ridge #c0c0c0;
-      background: #c0c0c0;
-      box-shadow: 6px 6px 0 #000;
+      border: 4px ridge #c8c9e6;
+      background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 5px),
+        linear-gradient(120deg, #343a78, #242a62 48%, #3b316b);
+      box-shadow: 6px 6px 0 #0d1035;
     }
 
     .routine-book {
@@ -2373,10 +2377,12 @@
       justify-content: space-between;
       gap: 10px;
       padding: 22px 10px 10px;
-      border: 3px outset #f5f5f5;
+      border: 3px outset #e4e6fb;
       color: #fff;
-      background: #0000a0;
-      box-shadow: 2px 2px 0 #000;
+      background:
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, .055) 0 1px, transparent 1px 6px),
+        linear-gradient(90deg, #263276, #4b4a93 54%, #715990);
+      box-shadow: 2px 2px 0 #151844;
       position: relative;
     }
 
@@ -2386,8 +2392,8 @@
       left: 4px;
       right: 4px;
       padding: 2px 5px;
-      color: #fff;
-      background: #00007a;
+      color: #e7ffff;
+      background: linear-gradient(90deg, #1c255f, #373674 60%, #50427c);
       content: "[ NGA ROUTINE FILES.EXE ]  ★  ONLINE  ★";
       font-family: Tahoma, Verdana, sans-serif;
       font-size: .65rem;
@@ -2396,8 +2402,8 @@
     }
 
     .routine-book-heading p { margin: 5px 0 0; }
-    .routine-book-heading h2 { color: #ffff00; font-family: "Arial Black", Impact, sans-serif; font-size: 1.35rem; text-shadow: 2px 2px #f000a8; }
-    .routine-book-heading .muted { color: #fff; font-family: Verdana, Geneva, sans-serif; font-size: .74rem; }
+    .routine-book-heading h2 { color: #d9ffff; font-family: "Arial Black", Impact, sans-serif; font-size: 1.35rem; text-shadow: 2px 2px #35336e; }
+    .routine-book-heading .muted { color: #e8e6ff; font-family: Verdana, Geneva, sans-serif; font-size: .74rem; }
 
     .routine-book-grid {
       display: grid;
@@ -2408,22 +2414,25 @@
     .routine-book-card {
       break-inside: avoid;
       page-break-inside: avoid;
-      border: 3px outset #fff;
+      border: 3px outset #eeeefe;
       padding: 10px;
-      color: #000080;
-      background: #ffffcc;
-      box-shadow: 3px 3px 0 #000;
+      color: #222958;
+      background:
+        radial-gradient(circle at 94% 8%, rgba(133, 210, 214, .24), transparent 8rem),
+        repeating-linear-gradient(135deg, rgba(89, 87, 157, .045) 0 1px, transparent 1px 6px),
+        #f0efff;
+      box-shadow: 3px 3px 0 #161a46;
     }
 
-    .routine-book-card h3 { margin: 0; padding: 3px 5px; border: 2px inset #fff; color: #fff; background: #008080; font-family: Tahoma, Verdana, sans-serif; font-size: .9rem; }
-    .routine-book-meta { margin: 6px 0 9px; color: #000; font-family: Verdana, Geneva, sans-serif; font-size: .72rem; font-weight: 800; }
-    .routine-book-event + .routine-book-event { margin-top: 9px; padding-top: 8px; border-top: 2px dotted #0000aa; }
-    .routine-book-event h4 { margin: 0 0 5px; padding: 2px 4px; color: #fff; background: #9b008d; font-family: "Arial Black", Impact, sans-serif; font-size: .72rem; letter-spacing: .04em; }
+    .routine-book-card h3 { margin: 0; padding: 3px 5px; border: 2px inset #eafcff; color: #f4ffff; background: linear-gradient(90deg, #3f7184, #5b879d 55%, #7b719b); font-family: Tahoma, Verdana, sans-serif; font-size: .9rem; }
+    .routine-book-meta { margin: 6px 0 9px; color: #3c4172; font-family: Verdana, Geneva, sans-serif; font-size: .72rem; font-weight: 800; }
+    .routine-book-event + .routine-book-event { margin-top: 9px; padding-top: 8px; border-top: 2px dotted #8d91b9; }
+    .routine-book-event h4 { margin: 0 0 5px; padding: 2px 4px; color: #f6f3ff; background: linear-gradient(90deg, #5f4f87, #796295); font-family: "Arial Black", Impact, sans-serif; font-size: .72rem; letter-spacing: .04em; }
     .routine-book-list { margin: 0; padding-left: 22px; line-height: 1.35; font-size: .84rem; }
     .routine-book-list li + li { margin-top: 3px; }
-    .routine-book-list li::marker { color: #f000a8; font-weight: 900; }
-    .routine-book-empty, .routine-book-notes { margin: 0; color: #000; font-size: .78rem; line-height: 1.35; }
-    .routine-book-notes { margin-top: 7px; padding: 5px; border: 2px inset #fff; background: #c0ffff; }
+    .routine-book-list li::marker { color: #597a9a; font-weight: 900; }
+    .routine-book-empty, .routine-book-notes { margin: 0; color: #30355f; font-size: .78rem; line-height: 1.35; }
+    .routine-book-notes { margin-top: 7px; padding: 5px; border: 2px inset #e8e5fa; background: linear-gradient(90deg, #dfeef4, #e9e2f5); }
     .routine-book-card .routine-book-meta { margin-bottom: 0; font-size: .7rem; }
 
     body.print-view-active .control-panel,
