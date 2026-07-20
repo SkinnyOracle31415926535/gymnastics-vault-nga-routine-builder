@@ -2348,6 +2348,66 @@
       .shell, .topbar, .workspace, .progress, .panel, .routine-item, .decision, .event-special, .panel-body { width: 100%; color: #000000; background: #ffffff; box-shadow: none; }
       h1, h2, h3, .progress-name, .routine-name, .decision-title { color: #000000; text-shadow: none; }
     }
+    /* Read-only routine book */
+    .routine-book {
+      display: grid;
+      gap: 22px;
+    }
+
+    .routine-book-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 14px;
+      border-bottom: 3px double #24427a;
+    }
+
+    .routine-book-heading p { margin: 6px 0 0; }
+
+    .routine-book-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .routine-book-card {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      border: 2px solid #24427a;
+      padding: 16px;
+      background: #fff;
+    }
+
+    .routine-book-card h3 { margin: 0; }
+    .routine-book-meta { margin: 5px 0 14px; color: #303060; font-size: .84rem; }
+    .routine-book-event + .routine-book-event { margin-top: 14px; padding-top: 13px; border-top: 1px solid #9aa7cc; }
+    .routine-book-event h4 { margin: 0 0 7px; color: #102a75; font-size: .95rem; }
+    .routine-book-list { margin: 0; padding-left: 24px; line-height: 1.48; }
+    .routine-book-list li + li { margin-top: 3px; }
+    .routine-book-empty, .routine-book-notes { margin: 0; color: #373765; font-size: .84rem; line-height: 1.4; }
+    .routine-book-notes { margin-top: 8px; }
+
+    body.print-view-active .control-panel,
+    body.print-view-active .notice,
+    body.print-view-active .progress,
+    body.print-view-active .tabs,
+    body.print-view-active .footer-note { display: none; }
+
+    @media (max-width: 760px) {
+      .routine-book-grid { grid-template-columns: 1fr; }
+      .routine-book-heading { display: block; }
+      .routine-book-heading .button { margin-top: 12px; }
+    }
+
+    @media print {
+      body.print-view-active .browser-chrome,
+      body.print-view-active .topbar { display: none !important; }
+      body.print-view-active .workspace { border: 0; padding: 0; }
+      body.print-view-active .routine-book-grid { grid-template-columns: 1fr; }
+      body.print-view-active .routine-book-heading .button { display: none !important; }
+      body.print-view-active .routine-book-card { border-color: #555; }
+    }
   </style>
   <!-- Gymnastics Vault icon -->
   <link rel="icon" type="image/png" href="icon.png">
@@ -2429,6 +2489,7 @@
         <button class="button quiet" id="exportRoutine" type="button">Download routine JSON</button>
         <button class="button quiet" id="importRoutine" type="button">Import routine JSON</button>
         <button class="button quiet" id="printRoutine" type="button">Print</button>
+        <button class="button primary" id="viewAllRoutines" type="button">View all / print</button>
         <button class="button quiet" id="exportBackup" type="button">Backup all</button>
         <button class="button quiet" id="importBackup" type="button">Restore backup</button>
       </div>
@@ -2839,6 +2900,8 @@
     const workspace = document.getElementById("workspace");
     const eventTabs = document.getElementById("eventTabs");
     const soundToggle = document.getElementById("soundToggle");
+    const viewAllRoutines = document.getElementById("viewAllRoutines");
+    let allRoutinesView = false;
     let soundContext = null;
 
     function boundedWholeNumber(value, maximum) {
@@ -3376,6 +3439,7 @@
     }
 
     function renderApp(options) {
+      document.body.classList.toggle("print-view-active", allRoutinesView);
       renderAthleteControls();
       renderCatalogStatus();
       renderProgress();
@@ -3476,6 +3540,10 @@
     }
 
     function renderWorkspace(options) {
+      if (allRoutinesView) {
+        workspace.innerHTML = renderAllRoutines();
+        return;
+      }
       const preserveLibraryScroll = !options || options.preserveLibraryScroll !== false;
       const previousLibrary = preserveLibraryScroll ? workspace.querySelector("#libraryList") : null;
       const previousLibraryScroll = previousLibrary ? previousLibrary.scrollTop : 0;
@@ -3492,6 +3560,43 @@
         const nextLibrary = workspace.querySelector("#libraryList");
         if (nextLibrary) nextLibrary.scrollTop = previousLibraryScroll;
       }
+    }
+
+    function renderRoutineBookEvent(eventId, athlete) {
+      const event = EVENTS[eventId];
+      const data = athlete.events[eventId] || emptyEvent();
+      let content = "";
+      if (event.type === "vault") {
+        const options = vaultPlanFor(athlete.level).choices || [];
+        const selected = (data.special.vaults || []).map(function (id) {
+          const option = options.find(function (item) { return item.id === id; });
+          return option ? option.label : id;
+        });
+        content = selected.length
+          ? "<ol class=\"routine-book-list\">" + selected.map(function (item) { return "<li>" + escapeHtml(item) + "</li>"; }).join("") + "</ol>"
+          : "<p class=\"routine-book-empty\">Not planned</p>";
+      } else {
+        const skills = data.skills || [];
+        content = skills.length
+          ? "<ol class=\"routine-book-list\">" + skills.map(function (skill) {
+              const labels = [effectiveKind(skill), skill.eg ? "EG " + skill.eg : "", skill.spotted ? "spot used" : ""].filter(Boolean);
+              return "<li>" + escapeHtml(skill.name) + (labels.length ? " <span class=\"routine-book-meta\">(" + escapeHtml(labels.join(" · ")) + ")</span>" : "") + "</li>";
+            }).join("") + "</ol>"
+          : "<p class=\"routine-book-empty\">Not planned</p>";
+      }
+      const notes = data.notes ? "<p class=\"routine-book-notes\"><strong>Coach notes:</strong> " + escapeHtml(data.notes) + "</p>" : "";
+      return "<section class=\"routine-book-event\"><h4>" + escapeHtml(event.name) + "</h4>" + content + notes + "</section>";
+    }
+
+    function renderAllRoutines() {
+      const cards = STUDENTS.map(function (student) {
+        const athlete = state.athletes[student.id] || emptyAthlete();
+        const details = [athlete.level || "Level not selected", athlete.status || "draft"].join(" · ");
+        return "<article class=\"routine-book-card\"><h3>" + escapeHtml(student.name) + "</h3><p class=\"routine-book-meta\">" + escapeHtml(details) + "</p>" +
+          EVENT_ORDER.slice(1).map(function (eventId) { return renderRoutineBookEvent(eventId, athlete); }).join("") +
+          "</article>";
+      }).join("");
+      return "<section class=\"routine-book\" aria-label=\"All athlete routines, read only\"><div class=\"routine-book-heading\"><div><h2>All routines</h2><p class=\"muted\">Read-only routine book. Use Print to create a paper copy; return to editing to make changes.</p></div><div class=\"action-row\"><button class=\"button quiet\" type=\"button\" data-action=\"exit-all-routines\">Back to editor</button><button class=\"button primary\" type=\"button\" data-action=\"print-all-routines\">Print all routines</button></div></div><div class=\"routine-book-grid\">" + cards + "</div></section>";
     }
 
     function renderOverview() {
@@ -4711,6 +4816,10 @@
       document.getElementById("saveStatus").textContent = "Routine summary downloaded";
     });
     document.getElementById("printRoutine").addEventListener("click", function () { window.print(); });
+    viewAllRoutines.addEventListener("click", function () {
+      allRoutinesView = true;
+      renderApp({ preserveLibraryScroll: false });
+    });
 
     soundToggle.addEventListener("click", function () {
       state.soundEnabled = !state.soundEnabled;
@@ -4740,6 +4849,15 @@
       const action = event.target.closest("[data-action]");
       if (!action) return;
       const kind = action.dataset.action;
+      if (kind === "exit-all-routines") {
+        allRoutinesView = false;
+        renderApp({ preserveLibraryScroll: false });
+        return;
+      }
+      if (kind === "print-all-routines") {
+        window.print();
+        return;
+      }
       if (kind === "toggle-star") {
         toggleStar(action.dataset.starKey);
         return;
